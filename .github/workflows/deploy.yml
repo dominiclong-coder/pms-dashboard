@@ -4,7 +4,11 @@ on:
   push:
     branches:
       - main
+  schedule:
+    # Run daily at 7 AM GMT/UTC to refresh data
+    - cron: '0 7 * * *'
   workflow_dispatch:
+    # Allow manual trigger from GitHub Actions page
 
 permissions:
   contents: read
@@ -30,6 +34,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Fetch registration data
+        run: npx tsx scripts/fetch-data.ts
+        env:
+          API_TOKEN: ${{ secrets.API_TOKEN }}
 
       - name: Build
         run: npm run build

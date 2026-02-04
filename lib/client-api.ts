@@ -1,31 +1,48 @@
-// Client-side API for fetching directly from MyProductCares API
-// Used for static GitHub Pages deployment
+// Client-side data loading for static GitHub Pages deployment
+// Hybrid approach: Static data for instant load + API fetch for refresh
+
+import { Registration, StaticData } from "./types";
+
+// Re-export types for backward compatibility
+export type { Registration, StaticData };
 
 const API_BASE_URL = "https://product-reg.varify.xyz/api";
 
-// API token embedded at build time
+// API token embedded at build time (for refresh functionality)
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || "";
-
-export interface Registration {
-  id: string | number;
-  customerName?: string;
-  customerEmail?: string;
-  productName?: string;
-  productSku?: string;
-  serialNumbers?: string[];
-  purchaseDate?: string;
-  createdAt?: string;
-  status?: string;
-  type?: string;
-  fieldData?: Record<string, unknown>;
-}
 
 // Helper function for delays (used for rate limiting)
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Fetch a single page of registrations
+// Load pre-fetched static data from the JSON file
+export async function loadStaticData(): Promise<StaticData> {
+  // Use basePath for GitHub Pages deployment
+  const basePath = process.env.NODE_ENV === "production" ? "/pms-dashboard" : "";
+  const response = await fetch(`${basePath}/data/registrations.json`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to load data: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// Format the last updated timestamp for display
+export function formatLastUpdated(isoString: string): string {
+  const date = new Date(isoString);
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+// Fetch a single page of registrations from the API
 async function fetchPage(
   page: number,
   limit: number,
@@ -53,30 +70,56 @@ async function fetchPage(
   };
 }
 
-// Fetch all registrations for a form type
-// Uses smaller batches to work around API pagination bug
-export async function fetchAllRegistrations(
+// Fetch only NEW registrations since a given timestamp
+// Returns records created AFTER the sinceTimestamp
+export async function fetchNewestRegistrations(
   formSlug: string,
-  onProgress?: (loaded: number, page: number) => void
+  sinceTimestamp: string,
+  existingIds: Set<string | number>,
+  onProgress?: (count: number) => void
 ): Promise<Registration[]> {
-  const allRegistrations: Registration[] = [];
-  const seenIds = new Set<string | number>();
+  const newRegistrations: Registration[] = [];
+  const sinceDate = new Date(sinceTimestamp);
   let page = 1;
-  const limit = 100; // Use 100 for bulk fetching
+  const limit = 100;
+  let consecutiveOldPages = 0;
 
   while (true) {
     try {
       const { data, hasMore } = await fetchPage(page, limit, formSlug);
 
+      let newInThisPage = 0;
+      let oldInThisPage = 0;
+
       for (const reg of data) {
-        if (!seenIds.has(reg.id)) {
-          seenIds.add(reg.id);
-          allRegistrations.push(reg);
+        // Skip if we already have this record
+        if (existingIds.has(reg.id)) {
+          oldInThisPage++;
+          continue;
+        }
+
+        // Check if this record is newer than our static data
+        const regDate = reg.createdAt ? new Date(reg.createdAt) : null;
+        if (regDate && regDate > sinceDate) {
+          newRegistrations.push(reg);
+          newInThisPage++;
+        } else {
+          oldInThisPage++;
         }
       }
 
       if (onProgress) {
-        onProgress(allRegistrations.length, page);
+        onProgress(newRegistrations.length);
+      }
+
+      // If we got a page with no new records, we've probably caught up
+      if (newInThisPage === 0) {
+        consecutiveOldPages++;
+        if (consecutiveOldPages >= 2) {
+          break;
+        }
+      } else {
+        consecutiveOldPages = 0;
       }
 
       if (!hasMore) break;
@@ -86,97 +129,12 @@ export async function fetchAllRegistrations(
       await sleep(2000);
 
       // Safety limit
-      if (page > 500) break;
+      if (page > 100) break;
     } catch (error) {
       console.error(`Error fetching page ${page}:`, error);
       break;
     }
   }
 
-  return allRegistrations;
-}
-
-// Fetch recent registrations (for quick initial load)
-export async function fetchRecentRegistrations(
-  formSlug: string,
-  maxRecords: number = 1000
-): Promise<Registration[]> {
-  const registrations: Registration[] = [];
-  const seenIds = new Set<string | number>();
-  let page = 1;
-  const limit = 100;
-
-  while (registrations.length < maxRecords) {
-    try {
-      const { data, hasMore } = await fetchPage(page, limit, formSlug);
-
-      for (const reg of data) {
-        if (!seenIds.has(reg.id)) {
-          seenIds.add(reg.id);
-          registrations.push(reg);
-        }
-      }
-
-      if (!hasMore || registrations.length >= maxRecords) break;
-      page++;
-
-      await sleep(2000);
-
-      if (page > 20) break; // Limit pages for quick load
-    } catch (error) {
-      console.error(`Error fetching page ${page}:`, error);
-      break;
-    }
-  }
-
-  return registrations;
-}
-
-// Cache in localStorage for persistence between page loads
-const CACHE_KEY = "myproductcares_cache";
-const CACHE_EXPIRY_HOURS = 1;
-
-interface CachedData {
-  registrationsByForm: Record<string, Registration[]>;
-  timestamp: number;
-}
-
-export function getCachedData(): CachedData | null {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (!cached) return null;
-
-    const data: CachedData = JSON.parse(cached);
-    const hoursSinceCache = (Date.now() - data.timestamp) / (1000 * 60 * 60);
-
-    if (hoursSinceCache > CACHE_EXPIRY_HOURS) {
-      localStorage.removeItem(CACHE_KEY);
-      return null;
-    }
-
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-export function setCachedData(registrationsByForm: Record<string, Registration[]>): void {
-  if (typeof window === "undefined") return;
-
-  try {
-    const data: CachedData = {
-      registrationsByForm,
-      timestamp: Date.now(),
-    };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-  } catch (error) {
-    console.error("Failed to cache data:", error);
-  }
-}
-
-export function clearCache(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(CACHE_KEY);
+  return newRegistrations;
 }

@@ -16,10 +16,10 @@ import {
 } from "@/lib/analytics";
 import {
   Registration,
-  fetchAllRegistrations,
-  getCachedData,
-  setCachedData,
-  clearCache,
+  StaticData,
+  loadStaticData,
+  formatLastUpdated,
+  fetchNewestRegistrations,
 } from "@/lib/client-api";
 
 function formatNumber(num: number): string {
@@ -70,7 +70,7 @@ function filterChartDataByDateRange(
   });
 }
 
-// Claim types to sync
+// Claim types
 const CLAIM_TYPES = [
   { slug: "warranty-claim", name: "Warranty Claims" },
   { slug: "return-claim", name: "Return Claims" },
@@ -85,55 +85,81 @@ export default function Dashboard() {
   // Data state
   const [registrationsByForm, setRegistrationsByForm] = useState<Record<string, Registration[]>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState({ currentForm: "", count: 0 });
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState<{ form: string; count: number } | null>(null);
+  const [staticDataTimestamp, setStaticDataTimestamp] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [newClaimsCount, setNewClaimsCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  // Load cached data on mount
+  // Load static data on mount
   useEffect(() => {
-    const cached = getCachedData();
-    if (cached) {
-      setRegistrationsByForm(cached.registrationsByForm);
-      setLastUpdated(new Date(cached.timestamp));
-      setIsLoading(false);
-    } else {
-      // No cache, trigger initial sync
-      syncData();
-    }
+    loadStaticData()
+      .then((data: StaticData) => {
+        setRegistrationsByForm({
+          "warranty-claim": data.warrantyRegistrations,
+          "return-claim": data.returnRegistrations,
+        });
+        setStaticDataTimestamp(data.metadata.fetchedAt);
+        setLastUpdated(data.metadata.fetchedAt);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to load data");
+        setIsLoading(false);
+      });
   }, []);
 
-  // Sync data from API
-  const syncData = useCallback(async () => {
-    setIsSyncing(true);
-    setError(null);
+  // Refresh to fetch newest records
+  const handleRefresh = useCallback(async () => {
+    if (!staticDataTimestamp || isRefreshing) return;
+
+    setIsRefreshing(true);
+    setNewClaimsCount(0);
+    setRefreshProgress(null);
 
     try {
-      const newData: Record<string, Registration[]> = {};
+      let totalNewClaims = 0;
+      const updatedData = { ...registrationsByForm };
 
       for (const claimTypeInfo of CLAIM_TYPES) {
-        setSyncProgress({ currentForm: claimTypeInfo.name, count: 0 });
+        setRefreshProgress({ form: claimTypeInfo.name, count: 0 });
 
-        const registrations = await fetchAllRegistrations(
+        // Get existing IDs to avoid duplicates
+        const existingIds = new Set(
+          (registrationsByForm[claimTypeInfo.slug] || []).map((r) => r.id)
+        );
+
+        // Fetch only new records since the static data was built
+        const newRecords = await fetchNewestRegistrations(
           claimTypeInfo.slug,
-          (loaded) => {
-            setSyncProgress({ currentForm: claimTypeInfo.name, count: loaded });
+          staticDataTimestamp,
+          existingIds,
+          (count) => {
+            setRefreshProgress({ form: claimTypeInfo.name, count });
           }
         );
 
-        newData[claimTypeInfo.slug] = registrations;
+        if (newRecords.length > 0) {
+          // Merge new records with existing data
+          updatedData[claimTypeInfo.slug] = [
+            ...newRecords,
+            ...(registrationsByForm[claimTypeInfo.slug] || []),
+          ];
+          totalNewClaims += newRecords.length;
+        }
       }
 
-      setRegistrationsByForm(newData);
-      setCachedData(newData);
-      setLastUpdated(new Date());
+      setRegistrationsByForm(updatedData);
+      setNewClaimsCount(totalNewClaims);
+      setLastUpdated(new Date().toISOString());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to sync data");
+      console.error("Refresh failed:", err);
     } finally {
-      setIsSyncing(false);
-      setIsLoading(false);
+      setIsRefreshing(false);
+      setRefreshProgress(null);
     }
-  }, []);
+  }, [staticDataTimestamp, registrationsByForm, isRefreshing]);
 
   // Get registrations for selected claim type
   const formSlug = claimType === "warranty" ? "warranty-claim" : "return-claim";
@@ -172,17 +198,31 @@ export default function Dashboard() {
     setFilters({});
   };
 
-  if (error && !hasData) {
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-8">
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-2xl font-bold text-slate-900 mb-8">Claims Dashboard</h1>
+          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-slate-600">Loading dashboard data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
     return (
       <div className="min-h-screen bg-slate-50 p-8">
         <div className="max-w-2xl mx-auto bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">Failed to load data: {error}</p>
-          <button
-            onClick={syncData}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-          >
-            Retry
-          </button>
+          <p className="text-red-800 font-medium">Failed to load data</p>
+          <p className="text-red-600 text-sm mt-1">{error}</p>
+          <p className="text-slate-600 text-sm mt-4">
+            This may be a temporary issue. Try refreshing the page.
+          </p>
         </div>
       </div>
     );
@@ -202,60 +242,36 @@ export default function Dashboard() {
           <div className="flex items-center gap-4">
             {lastUpdated && (
               <span className="text-sm text-slate-500">
-                Updated: {lastUpdated.toLocaleTimeString()}
+                Data as of: {formatLastUpdated(lastUpdated)}
+                {newClaimsCount > 0 && (
+                  <span className="text-green-600 ml-2">
+                    (+{newClaimsCount} new)
+                  </span>
+                )}
               </span>
             )}
             <button
-              onClick={() => {
-                clearCache();
-                syncData();
-              }}
-              disabled={isSyncing}
+              onClick={handleRefresh}
+              disabled={isRefreshing}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm flex items-center gap-2"
             >
-              {isSyncing && (
+              {isRefreshing && (
                 <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
               )}
-              {isSyncing ? "Syncing..." : "Refresh"}
+              {isRefreshing ? "Refreshing..." : "Refresh"}
             </button>
           </div>
         </div>
 
-        {/* Sync Progress */}
-        {isSyncing && (
+        {/* Refresh Progress */}
+        {isRefreshing && refreshProgress && (
           <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center gap-3">
               <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
               <p className="text-blue-800">
-                {syncProgress.currentForm
-                  ? `Syncing ${syncProgress.currentForm}... (${formatNumber(syncProgress.count)} records)`
-                  : "Starting sync..."}
+                Checking for new {refreshProgress.form}...
+                {refreshProgress.count > 0 && ` (${refreshProgress.count} found)`}
               </p>
-            </div>
-            <p className="text-xs text-blue-600 mt-2">
-              Note: Full sync takes several minutes due to API rate limits (2s delay between requests).
-            </p>
-          </div>
-        )}
-
-        {/* Initial Loading */}
-        {isLoading && !isSyncing && (
-          <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-yellow-800">Loading cached data...</p>
-          </div>
-        )}
-
-        {/* No Data Prompt */}
-        {!isLoading && !isSyncing && !hasData && (
-          <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-yellow-800">Click Refresh to load claim data for analysis.</p>
-              <button
-                onClick={syncData}
-                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
-              >
-                Start Sync
-              </button>
             </div>
           </div>
         )}
