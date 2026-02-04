@@ -18,9 +18,7 @@ function sleep(ms: number): Promise<void> {
 
 // Load pre-fetched static data from the JSON file
 export async function loadStaticData(): Promise<StaticData> {
-  // Use basePath for GitHub Pages deployment
-  const basePath = process.env.NODE_ENV === "production" ? "/pms-dashboard" : "";
-  const response = await fetch(`${basePath}/data/registrations.json`);
+  const response = await fetch(`/data/registrations.json`);
 
   if (!response.ok) {
     throw new Error(`Failed to load data: ${response.status}`);

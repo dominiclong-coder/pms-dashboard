@@ -35,22 +35,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Debug - Check if secret exists
-        run: |
-          if [ -z "$API_TOKEN" ]; then
-            echo "ERROR: API_TOKEN environment variable is empty or not set!"
-            echo "Make sure the secret is added at: Settings > Secrets and variables > Actions > New repository secret"
-          else
-            echo "API_TOKEN is set (length: ${#API_TOKEN} characters)"
-            echo "First 4 chars: ${API_TOKEN:0:4}..."
-          fi
-        env:
-          API_TOKEN: ${{ secrets.API_TOKEN }}
+      # NOTE: API fetch disabled due to Cloudflare bot protection blocking GitHub Actions
+      # Data must be fetched locally and committed to public/data/registrations.json
+      # Run locally: API_TOKEN=your_token npx tsx scripts/fetch-data.ts
 
-      - name: Fetch registration data
-        run: npx tsx scripts/fetch-data.ts
-        env:
-          API_TOKEN: ${{ secrets.API_TOKEN }}
+      - name: Check for static data
+        run: |
+          if [ -f "public/data/registrations.json" ]; then
+            echo "Static data found!"
+            echo "Last modified: $(stat -c %y public/data/registrations.json 2>/dev/null || stat -f %Sm public/data/registrations.json)"
+          else
+            echo "ERROR: public/data/registrations.json not found!"
+            echo "Please run the fetch script locally and commit the data:"
+            echo "  API_TOKEN=your_token npx tsx scripts/fetch-data.ts"
+            exit 1
+          fi
 
       - name: Build
         run: npm run build
