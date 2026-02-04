@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "tsx scripts/fetch-data.ts && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "fetch-data": "tsx scripts/fetch-data.ts"

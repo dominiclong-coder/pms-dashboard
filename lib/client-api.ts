@@ -79,7 +79,7 @@ export async function fetchNewestRegistrations(
   const newRegistrations: Registration[] = [];
   const sinceDate = new Date(sinceTimestamp);
   let page = 1;
-  const limit = 100;
+  const limit = 2; // Small limit to avoid rate limiting on client-side refresh
   let consecutiveOldPages = 0;
 
   while (true) {
