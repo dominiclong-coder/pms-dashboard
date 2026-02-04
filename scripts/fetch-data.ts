@@ -73,6 +73,8 @@ async function fetchRegistrationsPage(
       }
 
       if (!response.ok) {
+        const errorBody = await response.text();
+        console.error(`API Response Body: ${errorBody}`);
         throw new Error(`API error: ${response.status} ${response.statusText}`);
       }
 
