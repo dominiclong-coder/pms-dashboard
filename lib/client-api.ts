@@ -1,7 +1,7 @@
-// Client-side data loading for static GitHub Pages deployment
-// Hybrid approach: Static data for instant load + API fetch for refresh
+// Client-side data loading with Firebase for persistent shared storage
 
 import { Registration, StaticData } from "./types";
+import { loadFromFirebase, saveToFirebase, getExistingIds } from "./firebase";
 
 // Re-export types for backward compatibility
 export type { Registration, StaticData };
@@ -16,17 +16,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Load pre-fetched static data from the JSON file
-export async function loadStaticData(): Promise<StaticData> {
-  const response = await fetch(`/data/registrations.json`);
-
-  if (!response.ok) {
-    throw new Error(`Failed to load data: ${response.status}`);
-  }
-
-  return response.json();
-}
-
 // Format the last updated timestamp for display
 export function formatLastUpdated(isoString: string): string {
   const date = new Date(isoString);
@@ -38,6 +27,21 @@ export function formatLastUpdated(isoString: string): string {
     minute: "2-digit",
     hour12: true,
   });
+}
+
+// Load data from Firebase (replaces static JSON)
+export async function loadStaticData(): Promise<StaticData> {
+  const { warrantyRegistrations, returnRegistrations, metadata } = await loadFromFirebase();
+
+  return {
+    warrantyRegistrations,
+    returnRegistrations,
+    metadata: {
+      fetchedAt: metadata?.lastUpdated || new Date().toISOString(),
+      warrantyCount: warrantyRegistrations.length,
+      returnCount: returnRegistrations.length,
+    }
+  };
 }
 
 // Fetch a single page of registrations from the API
@@ -68,7 +72,7 @@ async function fetchPage(
   };
 }
 
-// Fetch registrations that we don't already have
+// Fetch registrations that we don't already have and save to Firebase
 // Uses limit=2 to catch records missed by the bulk fetch (API pagination quirk)
 export async function fetchNewestRegistrations(
   formSlug: string,
@@ -125,5 +129,18 @@ export async function fetchNewestRegistrations(
     }
   }
 
+  // Save new registrations to Firebase so everyone can see them
+  if (newRegistrations.length > 0) {
+    try {
+      await saveToFirebase(newRegistrations, formSlug);
+      console.log(`Saved ${newRegistrations.length} new ${formSlug} records to Firebase`);
+    } catch (error) {
+      console.error("Error saving to Firebase:", error);
+    }
+  }
+
   return newRegistrations;
 }
+
+// Get existing IDs from Firebase (for checking what we already have)
+export { getExistingIds };

@@ -1,8 +1,10 @@
 /**
  * Build-time data fetching script
  *
- * This script runs during GitHub Actions build to fetch all registration data
- * from the MyProductCares API and save it as a static JSON file.
+ * This script fetches all registration data from the MyProductCares API
+ * and saves it to:
+ * 1. Firebase Firestore (for production use)
+ * 2. Static JSON file (for backup/reference)
  *
  * Usage: npx tsx scripts/fetch-data.ts
  * Requires: API_TOKEN environment variable
@@ -10,6 +12,27 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, setDoc, writeBatch } from "firebase/firestore";
+
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyCsq18Lx-RaMf9eWproxaKGiMd-fkIdOPY",
+  authDomain: "pms-dashboard-62bc7.firebaseapp.com",
+  projectId: "pms-dashboard-62bc7",
+  storageBucket: "pms-dashboard-62bc7.firebasestorage.app",
+  messagingSenderId: "1065957058566",
+  appId: "1:1065957058566:web:6db647024140fc196ebb87"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+
+const COLLECTIONS = {
+  WARRANTY: "warranty-claims",
+  RETURN: "return-claims",
+  METADATA: "metadata"
+};
 
 const API_BASE_URL = "https://product-reg.varify.xyz/api";
 
@@ -144,6 +167,42 @@ async function fetchAllRegistrations(
   return allRegistrations;
 }
 
+// Upload registrations to Firebase
+async function uploadToFirebase(
+  registrations: Registration[],
+  collectionName: string,
+  label: string
+): Promise<number> {
+  console.log(`Uploading ${registrations.length} ${label} to Firebase...`);
+
+  const batchSize = 400;
+  let uploaded = 0;
+
+  for (let i = 0; i < registrations.length; i += batchSize) {
+    const batch = writeBatch(db);
+    const chunk = registrations.slice(i, i + batchSize);
+
+    for (const reg of chunk) {
+      const docRef = doc(db, collectionName, String(reg.id));
+      batch.set(docRef, reg, { merge: true });
+    }
+
+    await batch.commit();
+    uploaded += chunk.length;
+
+    const progress = Math.round((uploaded / registrations.length) * 100);
+    process.stdout.write(`\r  Progress: ${uploaded}/${registrations.length} (${progress}%)`);
+
+    // Delay between batches
+    if (i + batchSize < registrations.length) {
+      await sleep(500);
+    }
+  }
+
+  console.log(`\n  ✓ Uploaded ${uploaded} ${label}`);
+  return uploaded;
+}
+
 async function main() {
   const apiToken = process.env.API_TOKEN;
 
@@ -187,11 +246,23 @@ async function main() {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    // Write the data to a JSON file
+    // Write the data to a JSON file (backup)
     const outputPath = path.join(outputDir, "registrations.json");
     fs.writeFileSync(outputPath, JSON.stringify(staticData, null, 2));
+    console.log(`JSON backup saved to: ${outputPath}`);
 
-    console.log("========================================");
+    // Upload to Firebase
+    console.log("\n--- Uploading to Firebase ---");
+    await uploadToFirebase(warrantyRegistrations, COLLECTIONS.WARRANTY, "warranty claims");
+    await uploadToFirebase(returnRegistrations, COLLECTIONS.RETURN, "return claims");
+
+    // Update Firebase metadata
+    await setDoc(doc(db, COLLECTIONS.METADATA, "lastUpdate"), {
+      lastUpdated: staticData.metadata.fetchedAt
+    });
+    console.log("  ✓ Metadata updated");
+
+    console.log("\n========================================");
     console.log("Data fetch complete!");
     console.log(`Warranty claims: ${warrantyRegistrations.length}`);
     console.log(`Return claims: ${returnRegistrations.length}`);
