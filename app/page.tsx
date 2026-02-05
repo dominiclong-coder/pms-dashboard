@@ -95,33 +95,7 @@ export default function Dashboard() {
   // Track if auto-refresh has run
   const [hasAutoRefreshed, setHasAutoRefreshed] = useState(false);
 
-  // Load static data on mount
-  useEffect(() => {
-    loadStaticData()
-      .then((data: StaticData) => {
-        setRegistrationsByForm({
-          "warranty-claim": data.warrantyRegistrations,
-          "return-claim": data.returnRegistrations,
-        });
-        setStaticDataTimestamp(data.metadata.fetchedAt);
-        setLastUpdated(data.metadata.fetchedAt);
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Failed to load data");
-        setIsLoading(false);
-      });
-  }, []);
-
-  // Auto-refresh on first load to fill in missing records (due to API pagination quirk with limit=100)
-  useEffect(() => {
-    if (!isLoading && staticDataTimestamp && !hasAutoRefreshed && !isRefreshing) {
-      setHasAutoRefreshed(true);
-      handleRefresh();
-    }
-  }, [isLoading, staticDataTimestamp, hasAutoRefreshed, isRefreshing, handleRefresh]);
-
-  // Refresh to fetch newest records
+  // Refresh to fetch newest records (defined before useEffects that reference it)
   const handleRefresh = useCallback(async () => {
     if (!staticDataTimestamp || isRefreshing) return;
 
@@ -171,6 +145,32 @@ export default function Dashboard() {
       setRefreshProgress(null);
     }
   }, [staticDataTimestamp, registrationsByForm, isRefreshing]);
+
+  // Load static data on mount
+  useEffect(() => {
+    loadStaticData()
+      .then((data: StaticData) => {
+        setRegistrationsByForm({
+          "warranty-claim": data.warrantyRegistrations,
+          "return-claim": data.returnRegistrations,
+        });
+        setStaticDataTimestamp(data.metadata.fetchedAt);
+        setLastUpdated(data.metadata.fetchedAt);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to load data");
+        setIsLoading(false);
+      });
+  }, []);
+
+  // Auto-refresh on first load to fill in missing records (due to API pagination quirk with limit=100)
+  useEffect(() => {
+    if (!isLoading && staticDataTimestamp && !hasAutoRefreshed && !isRefreshing) {
+      setHasAutoRefreshed(true);
+      handleRefresh();
+    }
+  }, [isLoading, staticDataTimestamp, hasAutoRefreshed, isRefreshing, handleRefresh]);
 
   // Get registrations for selected claim type
   const formSlug = claimType === "warranty" ? "warranty-claim" : "return-claim";
