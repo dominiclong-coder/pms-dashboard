@@ -103,7 +103,7 @@ async function fetchAllRegistrations(
   const allRegistrations: Registration[] = [];
   const seenIds = new Set<string | number>();
   let page = 1;
-  const limit = 100;
+  const limit = 100; // Fast fetch for bulk data
 
   console.log(`\nFetching ${formSlug} registrations...`);
 

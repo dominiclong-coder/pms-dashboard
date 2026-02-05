@@ -92,6 +92,9 @@ export default function Dashboard() {
   const [newClaimsCount, setNewClaimsCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  // Track if auto-refresh has run
+  const [hasAutoRefreshed, setHasAutoRefreshed] = useState(false);
+
   // Load static data on mount
   useEffect(() => {
     loadStaticData()
@@ -109,6 +112,14 @@ export default function Dashboard() {
         setIsLoading(false);
       });
   }, []);
+
+  // Auto-refresh on first load to fill in missing records (due to API pagination quirk with limit=100)
+  useEffect(() => {
+    if (!isLoading && staticDataTimestamp && !hasAutoRefreshed && !isRefreshing) {
+      setHasAutoRefreshed(true);
+      handleRefresh();
+    }
+  }, [isLoading, staticDataTimestamp, hasAutoRefreshed, isRefreshing, handleRefresh]);
 
   // Refresh to fetch newest records
   const handleRefresh = useCallback(async () => {
