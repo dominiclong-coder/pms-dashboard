@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Registration, PurchaseVolume, PurchaseVolumeData } from "@/lib/types";
 import { calculateCohortSurvival } from "@/lib/analytics";
 import { CohortHeatmap } from "./CohortHeatmap";
@@ -50,6 +50,44 @@ function formatMonth(yearMonth: string): string {
   return `${monthNames[parseInt(month) - 1]} ${year}`;
 }
 
+// Calculate default date range based on claim type
+function calculateDefaultMonths(
+  availableMonths: string[],
+  claimType: "warranty" | "return"
+): { startMonth: string; endMonth: string } {
+  if (availableMonths.length === 0) {
+    return { startMonth: "", endMonth: "" };
+  }
+
+  const endMonth = availableMonths[availableMonths.length - 1];
+
+  if (claimType === "warranty") {
+    // Warranty: Last 12 months from most recent month
+    const startIndex = Math.max(0, availableMonths.length - 12);
+    return { startMonth: availableMonths[startIndex], endMonth };
+  } else {
+    // Return: Last 12 months OR Aug 2025 onwards (whichever gives MORE data)
+    const startIndexLast12 = Math.max(0, availableMonths.length - 12);
+    const aug2025Index = availableMonths.findIndex(m => m === "2025-08");
+
+    if (aug2025Index === -1) {
+      // Aug 2025 doesn't exist - use last 12 months
+      return { startMonth: availableMonths[startIndexLast12], endMonth };
+    }
+
+    // Calculate which gives more data points
+    const monthsFromLast12 = availableMonths.length - startIndexLast12;
+    const monthsFromAug2025 = availableMonths.length - aug2025Index;
+
+    // Use whichever gives MORE data
+    if (monthsFromAug2025 > monthsFromLast12) {
+      return { startMonth: availableMonths[aug2025Index], endMonth };
+    } else {
+      return { startMonth: availableMonths[startIndexLast12], endMonth };
+    }
+  }
+}
+
 export function CohortChartWithControls({
   registrations,
   purchaseVolumes,
@@ -58,14 +96,17 @@ export function CohortChartWithControls({
 }: CohortChartWithControlsProps) {
   const availableMonths = useMemo(() => generateAvailableMonths(), []);
 
-  // Set defaults: last 6 complete months
-  const defaultEndMonth = availableMonths[availableMonths.length - 1];
-  const defaultStartMonth = availableMonths[Math.max(0, availableMonths.length - 6)];
-
   const [productFilter, setProductFilter] = useState<string>("All Products");
-  const [startMonth, setStartMonth] = useState<string>(defaultStartMonth);
-  const [endMonth, setEndMonth] = useState<string>(defaultEndMonth);
+  const [startMonth, setStartMonth] = useState<string>("");
+  const [endMonth, setEndMonth] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Set defaults based on claim type
+  useEffect(() => {
+    const defaults = calculateDefaultMonths(availableMonths, claimType);
+    setStartMonth(defaults.startMonth);
+    setEndMonth(defaults.endMonth);
+  }, [availableMonths, claimType]);
 
   // Calculate cohort data
   const cohortData = useMemo(() => {
