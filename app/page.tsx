@@ -458,7 +458,7 @@ export default function Dashboard() {
         {hasData && (
           <div className="mt-6">
             <CohortChartWithControls
-              registrations={filteredRegistrations}
+              registrations={registrations}
               purchaseVolumes={purchaseVolumes}
               claimType={claimType}
               onPurchaseVolumesUpdate={handlePurchaseVolumesUpdate}
