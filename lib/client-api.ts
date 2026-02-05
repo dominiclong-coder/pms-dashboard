@@ -80,6 +80,13 @@ export async function fetchNewestRegistrations(
   existingIds: Set<string | number>,
   onProgress?: (count: number) => void
 ): Promise<Registration[]> {
+  // Skip refresh if Firebase has no data for this claim type
+  // This prevents trying to fetch thousands of records when Firebase is empty
+  if (existingIds.size === 0) {
+    console.log(`Skipping refresh for ${formSlug} - no existing data in Firebase`);
+    return [];
+  }
+
   const newRegistrations: Registration[] = [];
   let page = 1;
   const limit = 2; // Small limit to catch records missed by limit=100 bulk fetch
@@ -106,8 +113,8 @@ export async function fetchNewestRegistrations(
       // If we got a page with no new records, we've caught up with what limit=100 fetched
       if (newInThisPage === 0) {
         consecutiveOldPages++;
-        // Need more consecutive pages since missing records may be scattered
-        if (consecutiveOldPages >= 10) {
+        // Need a few consecutive pages since missing records may be scattered
+        if (consecutiveOldPages >= 5) {
           break;
         }
       } else {
@@ -117,12 +124,12 @@ export async function fetchNewestRegistrations(
       if (!hasMore) break;
       page++;
 
-      // Rate limiting: 2 second delay between requests
-      await sleep(2000);
+      // Rate limiting: 1 second delay between requests
+      await sleep(1000);
 
-      // Safety limit - fetch up to 200 pages (400 records with limit=2)
-      // This should be enough to catch ~100 missing records
-      if (page > 200) break;
+      // Safety limit - fetch up to 100 pages (200 records with limit=2)
+      // This catches the ~100 missing records from the limit=100 bulk fetch
+      if (page > 100) break;
     } catch (error) {
       console.error(`Error fetching page ${page}:`, error);
       break;
