@@ -473,6 +473,13 @@ export function calculateCohortSurvival(
     const exposureDays = calculateExposureDays(reg.purchaseDate, reg.createdAt);
     if (!isValidExposure(exposureDays, claimType)) return false;
 
+    // Filter by purchase channel - only include Shopify store purchases
+    const purchaseChannel = reg.fieldData?.["where-did-you-purchase-this-product-from-"] as string | undefined;
+    const validChannels = ["Shop App", "Zima Dental Website", "Zima Dental Website or Shop App"];
+    if (!purchaseChannel || !validChannels.includes(purchaseChannel)) {
+      return false;
+    }
+
     // Filter by product
     const productType = extractProductType(reg.productName);
 
