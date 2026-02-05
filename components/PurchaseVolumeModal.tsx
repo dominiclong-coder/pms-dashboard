@@ -10,8 +10,8 @@ interface PurchaseVolumeModalProps {
   onSave: (data: PurchaseVolumeData) => Promise<void>;
 }
 
+// Products that can be manually entered (All Products is auto-calculated)
 const PRODUCTS = [
-  "All Products",
   "Dental Pod Go",
   "Dental Pod",
   "Dental Pod Pro",
@@ -137,6 +137,9 @@ export function PurchaseVolumeModal({
         <div className="px-6 pt-4 pb-2">
           <p className="text-sm text-slate-600">
             Enter the number of units sold per month and product. Data is shown up to the most recent complete month.
+          </p>
+          <p className="text-sm text-blue-600 mt-2">
+            💡 "All Products" is automatically calculated as the sum of all individual products.
           </p>
         </div>
 

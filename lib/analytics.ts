@@ -473,9 +473,20 @@ export function calculateCohortSurvival(
     const exposureDays = calculateExposureDays(reg.purchaseDate, reg.createdAt);
     if (!isValidExposure(exposureDays, claimType)) return false;
 
-    // Filter by product if not "All Products"
-    if (productFilter !== "All Products") {
-      const productType = extractProductType(reg.productName);
+    // Filter by product
+    const productType = extractProductType(reg.productName);
+
+    if (productFilter === "All Products") {
+      // Only include claims from products we're tracking
+      const trackedProducts = [
+        "Dental Pod",
+        "Dental Pod Go",
+        "Dental Pod Pro",
+        "Zima Go/Zima UV Case/Zima Case Air",
+      ];
+      if (!trackedProducts.includes(productType)) return false;
+    } else {
+      // Filter for specific product
       if (productType !== productFilter) return false;
     }
 
@@ -524,8 +535,26 @@ export function calculateCohortSurvival(
 
   for (const cohortMonth of cohortMonths) {
     // Get purchase volume for this cohort
-    const volumeKey = `${cohortMonth}|${productFilter}`;
-    const purchaseVolume = volumeMap.get(volumeKey) || 0;
+    let purchaseVolume = 0;
+
+    if (productFilter === "All Products") {
+      // Sum all products for this month
+      const allProducts = [
+        "Dental Pod",
+        "Dental Pod Go",
+        "Dental Pod Pro",
+        "Zima Go/Zima UV Case/Zima Case Air",
+      ];
+
+      for (const product of allProducts) {
+        const volumeKey = `${cohortMonth}|${product}`;
+        purchaseVolume += volumeMap.get(volumeKey) || 0;
+      }
+    } else {
+      // Get specific product volume
+      const volumeKey = `${cohortMonth}|${productFilter}`;
+      purchaseVolume = volumeMap.get(volumeKey) || 0;
+    }
 
     for (let monthsSince = 0; monthsSince <= maxMonths; monthsSince++) {
       const claimCount = cohortClaims[cohortMonth][monthsSince] || 0;
