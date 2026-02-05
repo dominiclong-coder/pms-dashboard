@@ -138,7 +138,7 @@ export function CohortHeatmap({ data, maxMonths }: CohortHeatmapProps) {
                         onMouseMove={handleMouseMove}
                         onMouseLeave={handleMouseLeave}
                       >
-                        {hasPurchaseData ? `${point.survivalRate.toFixed(1)}%` : "N/A"}
+                        {hasPurchaseData ? `${point.survivalRate.toFixed(1)}%` : ""}
                       </td>
                     );
                   })}

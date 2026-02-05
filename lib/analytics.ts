@@ -533,6 +533,11 @@ export function calculateCohortSurvival(
   // Generate data points for each cohort and month
   const cohortMonths = Object.keys(cohortClaims).sort();
 
+  // Calculate the most recent complete month
+  const now = new Date();
+  const lastCompleteMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastCompleteMonthKey = getPeriodKey(lastCompleteMonth, "monthly");
+
   for (const cohortMonth of cohortMonths) {
     // Get purchase volume for this cohort
     let purchaseVolume = 0;
@@ -557,6 +562,18 @@ export function calculateCohortSurvival(
     }
 
     for (let monthsSince = 0; monthsSince <= maxMonths; monthsSince++) {
+      // Calculate what month this data point represents
+      const cohortDate = new Date(cohortMonth + "-01");
+      const dataPointDate = new Date(cohortDate);
+      dataPointDate.setMonth(dataPointDate.getMonth() + monthsSince);
+      const dataPointMonthKey = getPeriodKey(dataPointDate, "monthly");
+
+      // Only show data if we have a complete month of data
+      // (the data point month must be <= last complete month)
+      if (dataPointMonthKey > lastCompleteMonthKey) {
+        continue; // Skip this data point
+      }
+
       const claimCount = cohortClaims[cohortMonth][monthsSince] || 0;
 
       const claimRate = purchaseVolume > 0 ? (claimCount / purchaseVolume) * 100 : 0;
