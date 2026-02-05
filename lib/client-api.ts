@@ -68,8 +68,8 @@ async function fetchPage(
   };
 }
 
-// Fetch only NEW registrations since a given timestamp
-// Returns records created AFTER the sinceTimestamp
+// Fetch registrations that we don't already have
+// Uses limit=2 to catch records missed by the bulk fetch (API pagination quirk)
 export async function fetchNewestRegistrations(
   formSlug: string,
   sinceTimestamp: string,
@@ -77,9 +77,8 @@ export async function fetchNewestRegistrations(
   onProgress?: (count: number) => void
 ): Promise<Registration[]> {
   const newRegistrations: Registration[] = [];
-  const sinceDate = new Date(sinceTimestamp);
   let page = 1;
-  const limit = 2; // Small limit to avoid rate limiting on client-side refresh
+  const limit = 2; // Small limit to catch records missed by limit=100 bulk fetch
   let consecutiveOldPages = 0;
 
   while (true) {
@@ -87,22 +86,12 @@ export async function fetchNewestRegistrations(
       const { data, hasMore } = await fetchPage(page, limit, formSlug);
 
       let newInThisPage = 0;
-      let oldInThisPage = 0;
 
       for (const reg of data) {
-        // Skip if we already have this record
-        if (existingIds.has(reg.id)) {
-          oldInThisPage++;
-          continue;
-        }
-
-        // Check if this record is newer than our static data
-        const regDate = reg.createdAt ? new Date(reg.createdAt) : null;
-        if (regDate && regDate > sinceDate) {
+        // Add any record we don't already have
+        if (!existingIds.has(reg.id)) {
           newRegistrations.push(reg);
           newInThisPage++;
-        } else {
-          oldInThisPage++;
         }
       }
 
@@ -110,10 +99,11 @@ export async function fetchNewestRegistrations(
         onProgress(newRegistrations.length);
       }
 
-      // If we got a page with no new records, we've probably caught up
+      // If we got a page with no new records, we've caught up with what limit=100 fetched
       if (newInThisPage === 0) {
         consecutiveOldPages++;
-        if (consecutiveOldPages >= 2) {
+        // Need more consecutive pages since missing records may be scattered
+        if (consecutiveOldPages >= 10) {
           break;
         }
       } else {
@@ -126,8 +116,9 @@ export async function fetchNewestRegistrations(
       // Rate limiting: 2 second delay between requests
       await sleep(2000);
 
-      // Safety limit
-      if (page > 100) break;
+      // Safety limit - fetch up to 200 pages (400 records with limit=2)
+      // This should be enough to catch ~100 missing records
+      if (page > 200) break;
     } catch (error) {
       console.error(`Error fetching page ${page}:`, error);
       break;
