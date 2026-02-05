@@ -42,3 +42,26 @@ export interface FilterValues {
   subReasons: string[];
   purchaseChannels: string[];
 }
+
+// Purchase volume data for cohort analysis
+export interface PurchaseVolume {
+  yearMonth: string;        // "2024-01" format
+  product: string;          // "Dental Pod Go", "All Products", etc.
+  purchaseCount: number;    // Number of units sold
+}
+
+export interface PurchaseVolumeData {
+  volumes: PurchaseVolume[];
+  lastUpdated: string;
+}
+
+// Cohort analysis data point
+export interface CohortDataPoint {
+  cohortMonth: string;           // "2024-01"
+  cohortLabel: string;           // "Jan 2024"
+  monthsSincePurchase: number;   // 0, 1, 2, ...
+  claimCount: number;            // Claims filed (cumulative)
+  purchaseVolume: number;        // Total purchases in cohort
+  survivalRate: number;          // (1 - claims/purchases) * 100
+  claimRate: number;             // (claims/purchases) * 100
+}

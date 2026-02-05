@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { Filters } from "@/components/Filters";
 import { ClaimsChart } from "@/components/ClaimsChart";
 import { ClaimsOverTimeWithControls } from "@/components/ClaimsOverTimeChart";
+import { CohortChartWithControls } from "@/components/CohortChartWithControls";
 import { Tooltip } from "@/components/Tooltip";
 import {
   extractFilterValues,
@@ -21,6 +22,8 @@ import {
   formatLastUpdated,
   fetchNewestRegistrations,
 } from "@/lib/client-api";
+import { PurchaseVolume, PurchaseVolumeData } from "@/lib/types";
+import { loadPurchaseVolumes, savePurchaseVolumes } from "@/lib/firebase";
 
 function formatNumber(num: number): string {
   return num.toLocaleString();
@@ -95,7 +98,10 @@ export default function Dashboard() {
   // Track if auto-refresh has run
   const [hasAutoRefreshed, setHasAutoRefreshed] = useState(false);
 
-  // Refresh to fetch newest records (defined before useEffects that reference it)
+  // Purchase volumes for cohort analysis
+  const [purchaseVolumes, setPurchaseVolumes] = useState<PurchaseVolume[]>([]);
+
+  // Refresh to fetch newest records
   const handleRefresh = useCallback(async () => {
     if (!staticDataTimestamp || isRefreshing) return;
 
@@ -146,16 +152,20 @@ export default function Dashboard() {
     }
   }, [staticDataTimestamp, registrationsByForm, isRefreshing]);
 
-  // Load static data on mount
+  // Load static data and purchase volumes on mount
   useEffect(() => {
-    loadStaticData()
-      .then((data: StaticData) => {
+    Promise.all([
+      loadStaticData(),
+      loadPurchaseVolumes(),
+    ])
+      .then(([data, volumeData]) => {
         setRegistrationsByForm({
           "warranty-claim": data.warrantyRegistrations,
           "return-claim": data.returnRegistrations,
         });
         setStaticDataTimestamp(data.metadata.fetchedAt);
         setLastUpdated(data.metadata.fetchedAt);
+        setPurchaseVolumes(volumeData.volumes);
         setIsLoading(false);
       })
       .catch((err) => {
@@ -171,6 +181,12 @@ export default function Dashboard() {
       handleRefresh();
     }
   }, [isLoading, staticDataTimestamp, hasAutoRefreshed, isRefreshing, handleRefresh]);
+
+  // Handler for purchase volume updates
+  const handlePurchaseVolumesUpdate = useCallback(async (data: PurchaseVolumeData) => {
+    await savePurchaseVolumes(data);
+    setPurchaseVolumes(data.volumes);
+  }, []);
 
   // Get registrations for selected claim type
   const formSlug = claimType === "warranty" ? "warranty-claim" : "return-claim";
@@ -434,6 +450,18 @@ export default function Dashboard() {
               baseColor={chartColor}
               claimType={claimType}
               calculateClaimsOverTime={calculateClaimsOverTime}
+            />
+          </div>
+        )}
+
+        {/* Cohort Survival Analysis Chart */}
+        {hasData && (
+          <div className="mt-6">
+            <CohortChartWithControls
+              registrations={filteredRegistrations}
+              purchaseVolumes={purchaseVolumes}
+              claimType={claimType}
+              onPurchaseVolumesUpdate={handlePurchaseVolumesUpdate}
             />
           </div>
         )}

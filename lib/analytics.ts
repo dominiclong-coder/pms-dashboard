@@ -1,6 +1,7 @@
 // Analytics utilities for claims data processing
 
 import { Registration } from "./cache";
+import { CohortDataPoint, PurchaseVolume } from "./types";
 
 export interface ChartDataPoint {
   period: string; // "2024-01" for monthly, "2024-W01" for weekly
@@ -414,4 +415,135 @@ export function combineFilterValues(filterValuesArray: FilterValues[]): FilterVa
   }
 
   return combined;
+}
+
+// Extract product type from full product name for cohort analysis
+export function extractProductType(productName: string | undefined): string {
+  if (!productName) return "Other";
+
+  // Test patterns in order of specificity (most specific first)
+  // This handles variants like colors, "Copy", "LP Test", etc.
+
+  if (/Dental Pod Go/i.test(productName)) {
+    return "Dental Pod Go";
+  }
+
+  if (/Dental Pod Pro/i.test(productName)) {
+    return "Dental Pod Pro";
+  }
+
+  // Match "Dental Pod" but NOT "Dental Pod Go" or "Dental Pod Pro"
+  if (/Dental Pod(?!\s+(Go|Pro))/i.test(productName)) {
+    return "Dental Pod";
+  }
+
+  // Match all Zima variants
+  if (/Zima (Go|UV Case|Case Air)/i.test(productName)) {
+    return "Zima Go/Zima UV Case/Zima Case Air";
+  }
+
+  return "Other";
+}
+
+// Calculate months between two dates
+function calculateMonthsBetween(startDate: string, endDate: string): number {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  const yearDiff = end.getFullYear() - start.getFullYear();
+  const monthDiff = end.getMonth() - start.getMonth();
+
+  return yearDiff * 12 + monthDiff;
+}
+
+// Calculate cohort survival analysis data
+export function calculateCohortSurvival(
+  registrations: Registration[],
+  purchaseVolumes: PurchaseVolume[],
+  productFilter: string,
+  startMonth: string,      // "2024-01"
+  endMonth: string,        // "2024-12"
+  claimType: "warranty" | "return"
+): CohortDataPoint[] {
+  // 1. Filter registrations by valid exposure and product
+  const validRegistrations = registrations.filter((reg) => {
+    if (!reg.purchaseDate || !reg.createdAt) return false;
+
+    // Check exposure days validity
+    const exposureDays = calculateExposureDays(reg.purchaseDate, reg.createdAt);
+    if (!isValidExposure(exposureDays, claimType)) return false;
+
+    // Filter by product if not "All Products"
+    if (productFilter !== "All Products") {
+      const productType = extractProductType(reg.productName);
+      if (productType !== productFilter) return false;
+    }
+
+    return true;
+  });
+
+  // 2. Group registrations by purchase month cohort
+  const cohortClaims: Record<string, Record<number, number>> = {};
+
+  for (const reg of validRegistrations) {
+    if (!reg.purchaseDate || !reg.createdAt) continue;
+
+    const cohortMonth = getPeriodKey(new Date(reg.purchaseDate), "monthly");
+
+    // Only include cohorts within date range
+    if (cohortMonth < startMonth || cohortMonth > endMonth) continue;
+
+    // Calculate months since purchase
+    const monthsSince = calculateMonthsBetween(reg.purchaseDate, reg.createdAt);
+
+    // Initialize cohort if needed
+    if (!cohortClaims[cohortMonth]) {
+      cohortClaims[cohortMonth] = {};
+    }
+
+    // Increment claim count for this month and all subsequent months (cumulative)
+    const maxMonths = claimType === "warranty" ? 12 : 1;
+    for (let m = monthsSince; m <= maxMonths; m++) {
+      cohortClaims[cohortMonth][m] = (cohortClaims[cohortMonth][m] || 0) + 1;
+    }
+  }
+
+  // 3. Build cohort data points with purchase volumes
+  const dataPoints: CohortDataPoint[] = [];
+  const maxMonths = claimType === "warranty" ? 12 : 1;
+
+  // Create purchase volume lookup map
+  const volumeMap = new Map<string, number>();
+  for (const pv of purchaseVolumes) {
+    const key = `${pv.yearMonth}|${pv.product}`;
+    volumeMap.set(key, pv.purchaseCount);
+  }
+
+  // Generate data points for each cohort and month
+  const cohortMonths = Object.keys(cohortClaims).sort();
+
+  for (const cohortMonth of cohortMonths) {
+    // Get purchase volume for this cohort
+    const volumeKey = `${cohortMonth}|${productFilter}`;
+    const purchaseVolume = volumeMap.get(volumeKey) || 0;
+
+    for (let monthsSince = 0; monthsSince <= maxMonths; monthsSince++) {
+      const claimCount = cohortClaims[cohortMonth][monthsSince] || 0;
+
+      const claimRate = purchaseVolume > 0 ? (claimCount / purchaseVolume) * 100 : 0;
+      const survivalRate = 100 - claimRate;
+
+      dataPoints.push({
+        cohortMonth,
+        cohortLabel: getPeriodLabel(cohortMonth, "monthly"),
+        monthsSincePurchase: monthsSince,
+        claimCount,
+        purchaseVolume,
+        survivalRate,
+        claimRate,
+      });
+    }
+  }
+
+  return dataPoints;
 }

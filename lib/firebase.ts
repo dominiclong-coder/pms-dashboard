@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, doc, setDoc, getDocs, query, orderBy, writeBatch } from "firebase/firestore";
-import { Registration } from "./types";
+import { getFirestore, collection, doc, setDoc, getDocs, query, orderBy, writeBatch, getDoc } from "firebase/firestore";
+import { Registration, PurchaseVolumeData } from "./types";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCsq18Lx-RaMf9eWproxaKGiMd-fkIdOPY",
@@ -19,7 +19,8 @@ const db = getFirestore(app);
 const COLLECTIONS = {
   WARRANTY: "warranty-claims",
   RETURN: "return-claims",
-  METADATA: "metadata"
+  METADATA: "metadata",
+  PURCHASE_VOLUMES: "purchase-volumes"
 };
 
 // Load all registrations from Firebase
@@ -94,6 +95,41 @@ export async function getExistingIds(formSlug: string): Promise<Set<string | num
     ids.add(data.id);
   });
   return ids;
+}
+
+// Load purchase volumes from Firebase
+export async function loadPurchaseVolumes(): Promise<PurchaseVolumeData> {
+  try {
+    const docRef = doc(db, COLLECTIONS.PURCHASE_VOLUMES, "current");
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return docSnap.data() as PurchaseVolumeData;
+    }
+
+    // Return empty data if no purchase volumes exist yet
+    return {
+      volumes: [],
+      lastUpdated: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error("Error loading purchase volumes:", error);
+    throw error;
+  }
+}
+
+// Save purchase volumes to Firebase
+export async function savePurchaseVolumes(data: PurchaseVolumeData): Promise<void> {
+  try {
+    const docRef = doc(db, COLLECTIONS.PURCHASE_VOLUMES, "current");
+    await setDoc(docRef, {
+      volumes: data.volumes,
+      lastUpdated: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Error saving purchase volumes:", error);
+    throw error;
+  }
 }
 
 export { db, COLLECTIONS };
