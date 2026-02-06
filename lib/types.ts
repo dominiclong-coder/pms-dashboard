@@ -13,6 +13,9 @@ export interface Registration {
   type?: string;
   warranty?: string;
   warrantyEndDate?: string;
+  shopifyOrderId?: string | null;
+  shopifyOrderName?: string | null;
+  shopifyOrderCreatedAt?: string | null;
   fieldData?: Record<string, unknown>;
 }
 

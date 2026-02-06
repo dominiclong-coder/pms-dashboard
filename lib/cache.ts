@@ -17,6 +17,9 @@ export interface Registration {
   createdAt?: string;
   status?: string;
   type?: string;
+  shopifyOrderId?: string | null;
+  shopifyOrderName?: string | null;
+  shopifyOrderCreatedAt?: string | null;
   fieldData?: Record<string, unknown>;
 }
 

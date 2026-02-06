@@ -180,8 +180,9 @@ export function filterByValidExposure(
   claimType: "warranty" | "return"
 ): Registration[] {
   return registrations.filter((reg) => {
-    if (!reg.createdAt || !reg.purchaseDate) return false;
-    const exposureDays = calculateExposureDays(reg.purchaseDate, reg.createdAt);
+    // Require shopifyOrderCreatedAt - exclude if not present
+    if (!reg.createdAt || !reg.shopifyOrderCreatedAt) return false;
+    const exposureDays = calculateExposureDays(reg.shopifyOrderCreatedAt, reg.createdAt);
     return isValidExposure(exposureDays, claimType);
   });
 }
@@ -196,9 +197,9 @@ export function calculateClaimsPercentageByPeriod(
   const periodData: Record<string, { claimCount: number; totalExposureDays: number }> = {};
 
   for (const reg of registrations) {
-    if (!reg.createdAt || !reg.purchaseDate) continue;
+    if (!reg.createdAt || !reg.shopifyOrderCreatedAt) continue;
 
-    const exposureDays = calculateExposureDays(reg.purchaseDate, reg.createdAt);
+    const exposureDays = calculateExposureDays(reg.shopifyOrderCreatedAt, reg.createdAt);
 
     // Skip claims with invalid exposure days
     if (!isValidExposure(exposureDays, claimType)) continue;
@@ -467,10 +468,11 @@ export function calculateCohortSurvival(
 ): CohortDataPoint[] {
   // 1. Filter registrations by valid exposure and product
   const validRegistrations = registrations.filter((reg) => {
-    if (!reg.purchaseDate || !reg.createdAt) return false;
+    // Require shopifyOrderCreatedAt - exclude if not present
+    if (!reg.shopifyOrderCreatedAt || !reg.createdAt) return false;
 
     // Check exposure days validity
-    const exposureDays = calculateExposureDays(reg.purchaseDate, reg.createdAt);
+    const exposureDays = calculateExposureDays(reg.shopifyOrderCreatedAt, reg.createdAt);
     if (!isValidExposure(exposureDays, claimType)) return false;
 
     // Filter by purchase channel - only include Shopify store purchases for warranty claims
@@ -506,15 +508,15 @@ export function calculateCohortSurvival(
   const cohortClaims: Record<string, Record<number, number>> = {};
 
   for (const reg of validRegistrations) {
-    if (!reg.purchaseDate || !reg.createdAt) continue;
+    if (!reg.shopifyOrderCreatedAt || !reg.createdAt) continue;
 
-    const cohortMonth = getPeriodKey(new Date(reg.purchaseDate), "monthly");
+    const cohortMonth = getPeriodKey(new Date(reg.shopifyOrderCreatedAt), "monthly");
 
     // Only include cohorts within date range
     if (cohortMonth < startMonth || cohortMonth > endMonth) continue;
 
     // Calculate months since purchase
-    const monthsSince = calculateMonthsBetween(reg.purchaseDate, reg.createdAt);
+    const monthsSince = calculateMonthsBetween(reg.shopifyOrderCreatedAt, reg.createdAt);
 
     // Initialize cohort if needed
     if (!cohortClaims[cohortMonth]) {
