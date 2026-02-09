@@ -446,7 +446,7 @@ export default function Dashboard() {
         {hasData && (
           <div className="mt-6">
             <ClaimsOverTimeWithControls
-              registrations={filteredRegistrations}
+              registrations={allRegistrations}
               baseColor={chartColor}
               claimType={claimType}
               calculateClaimsOverTime={calculateClaimsOverTime}

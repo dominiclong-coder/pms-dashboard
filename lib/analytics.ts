@@ -317,12 +317,6 @@ export function calculateClaimsOverTime(
   for (const reg of registrations) {
     if (!reg.createdAt) continue;
 
-    // Validate exposure days if purchase date exists
-    if (reg.purchaseDate) {
-      const exposureDays = calculateExposureDays(reg.purchaseDate, reg.createdAt);
-      if (!isValidExposure(exposureDays, claimType)) continue;
-    }
-
     const claimDate = new Date(reg.createdAt);
     const periodKey = getExtendedPeriodKey(claimDate, period);
     const category = getGroupValue(reg, groupBy);
