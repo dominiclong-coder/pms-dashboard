@@ -87,6 +87,7 @@ export default function Dashboard() {
   const [dateRange, setDateRange] = useState<DateRange>("1y");
   const [actionLevelMultiplier, setActionLevelMultiplier] = useState(1);
   const [alertLevelMultiplier, setAlertLevelMultiplier] = useState(2);
+  const [showControlLimits, setShowControlLimits] = useState(true);
 
   // Data state
   const [registrationsByForm, setRegistrationsByForm] = useState<Record<string, Registration[]>>({});
@@ -445,76 +446,89 @@ export default function Dashboard() {
         {/* Control Limits Configuration */}
         {hasData && (
           <div className="mb-6 bg-white rounded-xl border border-slate-200 p-4">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Statistical Control Limits</h3>
-            <div className="grid grid-cols-2 gap-6">
-              {/* Action Level Multiplier */}
-              <div className="flex flex-col gap-3">
-                <label className="text-sm text-slate-600">
-                  Action Level (Mean + {actionLevelMultiplier.toFixed(1)}σ)
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="3"
-                    step="0.5"
-                    value={actionLevelMultiplier}
-                    onChange={(e) => setActionLevelMultiplier(parseFloat(e.target.value))}
-                    className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
-                  />
-                  <span className="text-sm font-medium text-slate-900 w-8 text-right">
-                    {actionLevelMultiplier.toFixed(1)}σ
-                  </span>
-                </div>
-                <span className="text-xs text-slate-500">
-                  Level: {controlLimits.actionLevel.toFixed(3)}%
-                </span>
-              </div>
-
-              {/* Alert Level Multiplier */}
-              <div className="flex flex-col gap-3">
-                <label className="text-sm text-slate-600">
-                  Alert Level (Mean + {alertLevelMultiplier.toFixed(1)}σ)
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="3"
-                    step="0.5"
-                    value={alertLevelMultiplier}
-                    onChange={(e) => setAlertLevelMultiplier(parseFloat(e.target.value))}
-                    className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
-                  />
-                  <span className="text-sm font-medium text-slate-900 w-8 text-right">
-                    {alertLevelMultiplier.toFixed(1)}σ
-                  </span>
-                </div>
-                <span className="text-xs text-slate-500">
-                  Level: {controlLimits.alertLevel.toFixed(3)}%
-                </span>
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-slate-900">Statistical Control Limits</h3>
+              <button
+                onClick={() => setShowControlLimits(!showControlLimits)}
+                className="text-slate-500 hover:text-slate-700 text-lg font-light transition-colors"
+                title={showControlLimits ? "Hide control limits" : "Show control limits"}
+              >
+                {showControlLimits ? "−" : "+"}
+              </button>
             </div>
-            
-            {/* Statistics Display */}
-            <div className="mt-4 pt-4 border-t border-slate-200">
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <span className="text-xs text-slate-500">Mean</span>
-                  <div className="text-sm font-semibold text-slate-900">{controlLimits.mean.toFixed(3)}%</div>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500">Std Dev</span>
-                  <div className="text-sm font-semibold text-slate-900">{controlLimits.stdDev.toFixed(3)}%</div>
-                </div>
-                <div>
-                  <span className="text-xs text-slate-500">Sample Size</span>
-                  <div className="text-sm font-semibold text-slate-900">
-                    {calculateClaimsPercentageByPeriod(registrations, period, claimType).length} periods
+            {showControlLimits && (
+              <>
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Action Level Multiplier */}
+                  <div className="flex flex-col gap-3">
+                    <label className="text-sm text-slate-600">
+                      Action Level (Mean + {actionLevelMultiplier.toFixed(1)}σ)
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="3"
+                        step="0.5"
+                        value={actionLevelMultiplier}
+                        onChange={(e) => setActionLevelMultiplier(parseFloat(e.target.value))}
+                        className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <span className="text-sm font-medium text-slate-900 w-8 text-right">
+                        {actionLevelMultiplier.toFixed(1)}σ
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-500">
+                      Level: {controlLimits.actionLevel.toFixed(3)}%
+                    </span>
+                  </div>
+
+                  {/* Alert Level Multiplier */}
+                  <div className="flex flex-col gap-3">
+                    <label className="text-sm text-slate-600">
+                      Alert Level (Mean + {alertLevelMultiplier.toFixed(1)}σ)
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="3"
+                        step="0.5"
+                        value={alertLevelMultiplier}
+                        onChange={(e) => setAlertLevelMultiplier(parseFloat(e.target.value))}
+                        className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <span className="text-sm font-medium text-slate-900 w-8 text-right">
+                        {alertLevelMultiplier.toFixed(1)}σ
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-500">
+                      Level: {controlLimits.alertLevel.toFixed(3)}%
+                    </span>
                   </div>
                 </div>
-              </div>
-            </div>
+                
+                {/* Statistics Display */}
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <span className="text-xs text-slate-500">Mean</span>
+                      <div className="text-sm font-semibold text-slate-900">{controlLimits.mean.toFixed(3)}%</div>
+                    </div>
+                    <div>
+                      <span className="text-xs text-slate-500">Std Dev</span>
+                      <div className="text-sm font-semibold text-slate-900">{controlLimits.stdDev.toFixed(3)}%</div>
+                    </div>
+                    <div>
+                      <span className="text-xs text-slate-500">Sample Size</span>
+                      <div className="text-sm font-semibold text-slate-900">
+                        {calculateClaimsPercentageByPeriod(registrations, period, claimType).length} periods
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -524,7 +538,7 @@ export default function Dashboard() {
             title={`${claimTypeLabel} % of Exposure Days`}
             data={chartData}
             color={chartColor}
-            controlLimits={controlLimits}
+            controlLimits={showControlLimits ? controlLimits : undefined}
           />
         )}
 
