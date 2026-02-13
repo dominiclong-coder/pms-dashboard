@@ -8,29 +8,53 @@ interface CohortHeatmapProps {
   maxMonths: number;
 }
 
-// Get color for survival rate
-function getSurvivalRateColor(rate: number, hasPurchaseData: boolean): string {
+// Get color for survival rate using a smooth gradient (Excel-style conditional formatting)
+// Maps survival rate to red-orange-yellow-green gradient based on data range
+function getSurvivalRateColor(rate: number, hasPurchaseData: boolean, minRate: number, maxRate: number): string {
   if (!hasPurchaseData) return "#f1f5f9"; // Gray for N/A
 
-  if (rate >= 98) return "#f0fdf4";      // Very light green
-  if (rate >= 95) return "#d1fae5";      // Light green
-  if (rate >= 90) return "#fef9c3";      // Light yellow
-  if (rate >= 85) return "#fde68a";      // Yellow
-  if (rate >= 80) return "#fcd34d";      // Dark yellow
-  if (rate >= 75) return "#fed7aa";      // Light orange
-  if (rate >= 70) return "#fdba74";      // Orange
-  if (rate >= 60) return "#fb923c";      // Dark orange
-  if (rate >= 50) return "#fecaca";      // Light red
-  return "#dc2626";                      // Red
+  // Clamp rate between 0 and 100
+  const clampedRate = Math.max(0, Math.min(100, rate));
+
+  // Normalize rate to 0-1 range based on min/max of actual data
+  const range = maxRate - minRate;
+  const normalizedRate = range === 0 ? 0.5 : (clampedRate - minRate) / range;
+  const t = Math.max(0, Math.min(1, normalizedRate)); // Ensure between 0 and 1
+
+  // Define gradient colors (3 key points: red, yellow, green)
+  let r, g, b;
+
+  if (t < 0.5) {
+    // Red to Yellow: t = 0 to 0.5
+    const t2 = t * 2; // Normalize to 0-1
+    r = Math.round(220 - (220 - 250) * t2); // 220 to 250
+    g = Math.round(38 + (204 - 38) * t2);   // 38 to 204
+    b = Math.round(38 - 38 * t2);           // 38 to 0
+  } else {
+    // Yellow to Green: t = 0.5 to 1
+    const t2 = (t - 0.5) * 2; // Normalize to 0-1
+    r = Math.round(250 - (250 - 34) * t2);  // 250 to 34
+    g = Math.round(204 + (197 - 204) * t2); // 204 to 197
+    b = Math.round(21 + (94 - 21) * t2);    // 21 to 94
+  }
+
+  // Convert RGB to hex
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 
-// Get text color for readability
+// Get text color for readability based on background brightness
 function getTextColor(bgColor: string): string {
-  // Dark backgrounds need white text
-  if (bgColor === "#dc2626" || bgColor === "#fb923c") {
-    return "#ffffff";
-  }
-  return "#1e293b"; // Dark gray for light backgrounds
+  // Parse hex color to RGB
+  const hex = bgColor.substring(1);
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  // Calculate perceived brightness (luminance)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  // Use white text on dark backgrounds (low luminance), dark text on light backgrounds
+  return luminance < 0.5 ? "#ffffff" : "#1e293b";
 }
 
 export function CohortHeatmap({ data, maxMonths }: CohortHeatmapProps) {
@@ -47,11 +71,20 @@ export function CohortHeatmap({ data, maxMonths }: CohortHeatmapProps) {
 
   // Group data by cohort
   const cohortMap = new Map<string, Map<number, CohortDataPoint>>();
+  let minSurvivalRate = 100;
+  let maxSurvivalRate = 0;
+
   for (const point of data) {
     if (!cohortMap.has(point.cohortMonth)) {
       cohortMap.set(point.cohortMonth, new Map());
     }
     cohortMap.get(point.cohortMonth)!.set(point.monthsSincePurchase, point);
+
+    // Track min/max survival rates (only for cells with purchase data)
+    if (point.purchaseVolume > 0) {
+      minSurvivalRate = Math.min(minSurvivalRate, point.survivalRate);
+      maxSurvivalRate = Math.max(maxSurvivalRate, point.survivalRate);
+    }
   }
 
   const cohorts = Array.from(cohortMap.keys()).sort();
@@ -126,7 +159,7 @@ export function CohortHeatmap({ data, maxMonths }: CohortHeatmapProps) {
                     }
 
                     const hasPurchaseData = point.purchaseVolume > 0;
-                    const bgColor = getSurvivalRateColor(point.survivalRate, hasPurchaseData);
+                    const bgColor = getSurvivalRateColor(point.survivalRate, hasPurchaseData, minSurvivalRate, maxSurvivalRate);
                     const textColor = getTextColor(bgColor);
 
                     return (

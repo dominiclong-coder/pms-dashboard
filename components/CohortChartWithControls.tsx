@@ -131,7 +131,7 @@ export function CohortChartWithControls({
       {/* Header & Controls */}
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-slate-900 mb-4">
-          Cohort Survival Analysis
+          Cohort Survival Analysis {claimType === "warranty" && "(Shopify Only)"}
         </h3>
 
         <div className="flex flex-wrap items-center gap-4">
