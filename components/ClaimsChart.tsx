@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ReferenceLine,
 } from "recharts";
 import { ChartDataPoint } from "@/lib/analytics";
 
@@ -16,6 +17,12 @@ interface ClaimsChartProps {
   title: string;
   data: ChartDataPoint[];
   color?: string;
+  controlLimits?: {
+    mean: number;
+    stdDev: number;
+    actionLevel: number;
+    alertLevel: number;
+  };
 }
 
 function formatPercentage(value: number): string {
@@ -47,7 +54,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   return null;
 }
 
-export function ClaimsChart({ title, data, color = "#3b82f6" }: ClaimsChartProps) {
+export function ClaimsChart({ title, data, color = "#3b82f6", controlLimits }: ClaimsChartProps) {
   if (data.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-6">
@@ -103,6 +110,49 @@ export function ClaimsChart({ title, data, color = "#3b82f6" }: ClaimsChartProps
               dot={{ fill: color, strokeWidth: 2, r: 4 }}
               activeDot={{ r: 6, fill: color }}
             />
+            {controlLimits && (
+              <>
+                <ReferenceLine
+                  y={controlLimits.mean}
+                  stroke="#64748b"
+                  strokeWidth={2}
+                  strokeDasharray="0"
+                  label={{
+                    value: `Mean: ${controlLimits.mean.toFixed(3)}%`,
+                    position: "right" as const,
+                    fill: "#64748b",
+                    fontSize: 11,
+                    offset: 5,
+                  }}
+                />
+                <ReferenceLine
+                  y={controlLimits.actionLevel}
+                  stroke="#f59e0b"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  label={{
+                    value: `Action: ${controlLimits.actionLevel.toFixed(3)}%`,
+                    position: "right" as const,
+                    fill: "#f59e0b",
+                    fontSize: 11,
+                    offset: 5,
+                  }}
+                />
+                <ReferenceLine
+                  y={controlLimits.alertLevel}
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  label={{
+                    value: `Alert: ${controlLimits.alertLevel.toFixed(3)}%`,
+                    position: "right" as const,
+                    fill: "#ef4444",
+                    fontSize: 11,
+                    offset: 5,
+                  }}
+                />
+              </>
+            )}
           </LineChart>
         </ResponsiveContainer>
       </div>

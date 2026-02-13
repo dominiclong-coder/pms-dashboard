@@ -85,6 +85,8 @@ export default function Dashboard() {
   const [filters, setFilters] = useState<FiltersType>({});
   const [claimsOverTimeFilters, setClaimsOverTimeFilters] = useState<FiltersType>({});
   const [dateRange, setDateRange] = useState<DateRange>("1y");
+  const [actionLevelMultiplier, setActionLevelMultiplier] = useState(1);
+  const [alertLevelMultiplier, setAlertLevelMultiplier] = useState(2);
 
   // Data state
   const [registrationsByForm, setRegistrationsByForm] = useState<Record<string, Registration[]>>({});
@@ -221,6 +223,31 @@ export default function Dashboard() {
     const rawChartData = calculateClaimsPercentageByPeriod(filteredRegistrations, period, claimType);
     return filterChartDataByDateRange(rawChartData, dateRange);
   }, [filteredRegistrations, period, claimType, dateRange]);
+
+  // Calculate statistical control limits from unfiltered data (independent of user filters)
+  const controlLimits = useMemo(() => {
+    // Use unfiltered chart data (registrations already filtered by exposure days, but not user filters)
+    const rawChartData = calculateClaimsPercentageByPeriod(registrations, period, claimType);
+    
+    if (rawChartData.length === 0) {
+      return { mean: 0, stdDev: 0, actionLevel: 0, alertLevel: 0 };
+    }
+    
+    // Calculate mean
+    const percentages = rawChartData.map(d => d.claimsPercentage);
+    const mean = percentages.reduce((a, b) => a + b, 0) / percentages.length;
+    
+    // Calculate standard deviation
+    const variance = percentages.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / percentages.length;
+    const stdDev = Math.sqrt(variance);
+    
+    return {
+      mean,
+      stdDev,
+      actionLevel: mean + (actionLevelMultiplier * stdDev),
+      alertLevel: mean + (alertLevelMultiplier * stdDev)
+    };
+  }, [registrations, period, claimType, actionLevelMultiplier, alertLevelMultiplier]);
 
   const hasActiveFilters = Object.values(filters).some((v) => v && v.length > 0);
   const hasData = Object.keys(registrationsByForm).length > 0;
@@ -415,12 +442,89 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Control Limits Configuration */}
+        {hasData && (
+          <div className="mb-6 bg-white rounded-xl border border-slate-200 p-4">
+            <h3 className="text-sm font-semibold text-slate-900 mb-4">Statistical Control Limits</h3>
+            <div className="grid grid-cols-2 gap-6">
+              {/* Action Level Multiplier */}
+              <div className="flex flex-col gap-3">
+                <label className="text-sm text-slate-600">
+                  Action Level (Mean + {actionLevelMultiplier.toFixed(1)}σ)
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="3"
+                    step="0.5"
+                    value={actionLevelMultiplier}
+                    onChange={(e) => setActionLevelMultiplier(parseFloat(e.target.value))}
+                    className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <span className="text-sm font-medium text-slate-900 w-8 text-right">
+                    {actionLevelMultiplier.toFixed(1)}σ
+                  </span>
+                </div>
+                <span className="text-xs text-slate-500">
+                  Level: {controlLimits.actionLevel.toFixed(3)}%
+                </span>
+              </div>
+
+              {/* Alert Level Multiplier */}
+              <div className="flex flex-col gap-3">
+                <label className="text-sm text-slate-600">
+                  Alert Level (Mean + {alertLevelMultiplier.toFixed(1)}σ)
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="3"
+                    step="0.5"
+                    value={alertLevelMultiplier}
+                    onChange={(e) => setAlertLevelMultiplier(parseFloat(e.target.value))}
+                    className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <span className="text-sm font-medium text-slate-900 w-8 text-right">
+                    {alertLevelMultiplier.toFixed(1)}σ
+                  </span>
+                </div>
+                <span className="text-xs text-slate-500">
+                  Level: {controlLimits.alertLevel.toFixed(3)}%
+                </span>
+              </div>
+            </div>
+            
+            {/* Statistics Display */}
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <span className="text-xs text-slate-500">Mean</span>
+                  <div className="text-sm font-semibold text-slate-900">{controlLimits.mean.toFixed(3)}%</div>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500">Std Dev</span>
+                  <div className="text-sm font-semibold text-slate-900">{controlLimits.stdDev.toFixed(3)}%</div>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500">Sample Size</span>
+                  <div className="text-sm font-semibold text-slate-900">
+                    {calculateClaimsPercentageByPeriod(registrations, period, claimType).length} periods
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Claims % Chart */}
         {hasData && (
           <ClaimsChart
             title={`${claimTypeLabel} % of Exposure Days`}
             data={chartData}
             color={chartColor}
+            controlLimits={controlLimits}
           />
         )}
 
