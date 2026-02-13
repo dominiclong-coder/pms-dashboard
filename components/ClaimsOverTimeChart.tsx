@@ -15,8 +15,12 @@ import {
   StackedChartDataPoint,
   TimePeriod,
   GroupBy,
+  applyFilters,
+  Filters as FiltersType,
+  FilterValues,
 } from "@/lib/analytics";
 import { Registration } from "@/lib/cache";
+import { Filters } from "./Filters";
 
 // Color palette for stacked bars
 const COLORS = [
@@ -375,6 +379,9 @@ interface ClaimsOverTimeWithControlsProps {
     groupBy: GroupBy,
     claimType: "warranty" | "return"
   ) => { data: StackedChartDataPoint[]; categories: string[] };
+  filterValues: FilterValues;
+  filters: FiltersType;
+  onFiltersChange: (filters: FiltersType) => void;
 }
 
 export function ClaimsOverTimeWithControls({
@@ -382,6 +389,9 @@ export function ClaimsOverTimeWithControls({
   baseColor,
   claimType,
   calculateClaimsOverTime,
+  filterValues,
+  filters,
+  onFiltersChange,
 }: ClaimsOverTimeWithControlsProps) {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("monthly");
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
@@ -390,9 +400,15 @@ export function ClaimsOverTimeWithControls({
   // Show date range selector for daily and weekly views
   const showDateRange = timePeriod === "daily" || timePeriod === "weekly";
 
+  // Apply filters to registrations
+  const filteredRegistrations = useMemo(
+    () => applyFilters(registrations, filters),
+    [registrations, filters]
+  );
+
   const { data: rawData, categories } = useMemo(
-    () => calculateClaimsOverTime(registrations, timePeriod, groupBy, claimType),
-    [registrations, timePeriod, groupBy, claimType, calculateClaimsOverTime]
+    () => calculateClaimsOverTime(filteredRegistrations, timePeriod, groupBy, claimType),
+    [filteredRegistrations, timePeriod, groupBy, claimType, calculateClaimsOverTime]
   );
 
   // Apply date range filter for daily/weekly
@@ -403,6 +419,12 @@ export function ClaimsOverTimeWithControls({
 
   return (
     <div>
+      {/* Filters */}
+      <Filters
+        filterValues={filterValues}
+        filters={filters}
+        onFiltersChange={onFiltersChange}
+      />
       <ChartControls
         timePeriod={timePeriod}
         groupBy={groupBy}

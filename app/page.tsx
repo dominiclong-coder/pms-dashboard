@@ -83,6 +83,7 @@ export default function Dashboard() {
   const [claimType, setClaimType] = useState<"warranty" | "return">("warranty");
   const [period, setPeriod] = useState<"weekly" | "monthly">("monthly");
   const [filters, setFilters] = useState<FiltersType>({});
+  const [claimsOverTimeFilters, setClaimsOverTimeFilters] = useState<FiltersType>({});
   const [dateRange, setDateRange] = useState<DateRange>("1y");
 
   // Data state
@@ -201,10 +202,15 @@ export default function Dashboard() {
   const rawCount = allRegistrations.length;
   const excludedCount = rawCount - totalCount;
 
-  // Calculate filter values
+  // Calculate filter values (from valid exposure registrations)
   const filterValues = useMemo(() => {
     return extractFilterValues(registrations);
   }, [registrations]);
+
+  // Calculate filter values for Claims Over Time chart (from all registrations, no exposure filter)
+  const allRegistrationsFilterValues = useMemo(() => {
+    return extractFilterValues(allRegistrations);
+  }, [allRegistrations]);
 
   // Apply filters and calculate chart data
   const filteredRegistrations = useMemo(() => {
@@ -223,6 +229,7 @@ export default function Dashboard() {
   const handleClaimTypeChange = (type: "warranty" | "return") => {
     setClaimType(type);
     setFilters({});
+    setClaimsOverTimeFilters({});
   };
 
   // Loading state
@@ -425,6 +432,9 @@ export default function Dashboard() {
               baseColor={chartColor}
               claimType={claimType}
               calculateClaimsOverTime={calculateClaimsOverTime}
+              filterValues={allRegistrationsFilterValues}
+              filters={claimsOverTimeFilters}
+              onFiltersChange={setClaimsOverTimeFilters}
             />
           </div>
         )}
