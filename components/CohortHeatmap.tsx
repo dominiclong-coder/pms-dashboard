@@ -8,8 +8,8 @@ interface CohortHeatmapProps {
   maxMonths: number;
 }
 
-// Get color for survival rate using a smooth gradient (Excel-style conditional formatting)
-// Maps survival rate to red-orange-yellow-green gradient based on data range
+// Get color for survival rate using Excel-style conditional formatting
+// Maps survival rate to a smooth red-orange-yellow-green gradient based on data range
 function getSurvivalRateColor(rate: number, hasPurchaseData: boolean, minRate: number, maxRate: number): string {
   if (!hasPurchaseData) return "#f1f5f9"; // Gray for N/A
 
@@ -21,21 +21,22 @@ function getSurvivalRateColor(rate: number, hasPurchaseData: boolean, minRate: n
   const normalizedRate = range === 0 ? 0.5 : (clampedRate - minRate) / range;
   const t = Math.max(0, Math.min(1, normalizedRate)); // Ensure between 0 and 1
 
-  // Define gradient colors (3 key points: red, yellow, green)
+  // Excel-style 3-color scale: Red (min) → Yellow/Orange (midpoint) → Green (max)
+  // This creates a professional heatmap similar to Excel's conditional formatting
   let r, g, b;
 
   if (t < 0.5) {
     // Red to Yellow: t = 0 to 0.5
     const t2 = t * 2; // Normalize to 0-1
-    r = Math.round(220 - (220 - 250) * t2); // 220 to 250
-    g = Math.round(38 + (204 - 38) * t2);   // 38 to 204
-    b = Math.round(38 - 38 * t2);           // 38 to 0
+    r = Math.round(249 - (249 - 250) * t2);    // #f92500 to #facc15: 249 to 250
+    g = Math.round(37 + (204 - 37) * t2);      // #f92500 to #facc15: 37 to 204
+    b = Math.round(0 + (21 - 0) * t2);         // #f92500 to #facc15: 0 to 21
   } else {
     // Yellow to Green: t = 0.5 to 1
     const t2 = (t - 0.5) * 2; // Normalize to 0-1
-    r = Math.round(250 - (250 - 34) * t2);  // 250 to 34
-    g = Math.round(204 + (197 - 204) * t2); // 204 to 197
-    b = Math.round(21 + (94 - 21) * t2);    // 21 to 94
+    r = Math.round(250 - (250 - 69) * t2);     // #facc15 to #45b446: 250 to 69
+    g = Math.round(204 - (204 - 180) * t2);    // #facc15 to #45b446: 204 to 180
+    b = Math.round(21 + (70 - 21) * t2);       // #facc15 to #45b446: 21 to 70
   }
 
   // Convert RGB to hex
