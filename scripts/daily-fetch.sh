@@ -1,7 +1,7 @@
 #!/bin/bash
 # Daily data fetch script for PMS Dashboard
 
-cd /Users/dominiclong/Documents/GitHub/pms-dashboard
+cd "/Users/dominiclong/Downloads/Code & Config/Claude Code/GitHub/pms-dashboard"
 
 # Set API token
 export API_TOKEN="178fc6cf98cee777e0e60d7f9a895dfba81192d091ad2ff604ab05565ed862e4"

@@ -331,37 +331,12 @@ export default function Dashboard() {
           <div className="bg-white rounded-xl border border-slate-200 px-6 py-3">
             <span className="text-sm text-slate-500 mr-2">{claimTypeLabel}:</span>
             <span className="text-2xl font-bold" style={{ color: chartColor }}>
-              {formatNumber(totalCount)}
+              {formatNumber(rawCount)}
             </span>
             {hasActiveFilters && (
               <span className="text-sm text-slate-500 ml-2">
                 ({formatNumber(filteredRegistrations.length)} filtered)
               </span>
-            )}
-            {excludedCount > 0 && (
-              <Tooltip
-                content={
-                  <div>
-                    <p className="font-medium mb-1">Why are claims excluded?</p>
-                    <p>
-                      {formatNumber(excludedCount)} claims have exposure days outside the valid range ({exposureLimit} days).
-                    </p>
-                    <p className="mt-2 text-slate-500">
-                      This typically indicates data quality issues:
-                    </p>
-                    <ul className="list-disc list-inside mt-1 text-slate-500">
-                      <li>Missing purchase dates</li>
-                      <li>Future-dated purchases</li>
-                      <li>Claims filed long after the {periodLabel}</li>
-                    </ul>
-                  </div>
-                }
-              >
-                <span className="text-xs text-slate-400 ml-2 border-b border-dotted border-slate-300">
-                  ({formatNumber(excludedCount)} excluded
-                  <span className="text-slate-300 ml-1">ⓘ</span>)
-                </span>
-              </Tooltip>
             )}
           </div>
         </div>
