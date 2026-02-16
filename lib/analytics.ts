@@ -261,7 +261,8 @@ export interface StackedChartDataPoint {
   period: string;
   periodLabel: string;
   total: number;
-  [key: string]: string | number; // Dynamic keys for each stack category
+  otherBreakdown?: Record<string, number>; // Breakdown of "Other" category
+  [key: string]: string | number | Record<string, number> | undefined; // Dynamic keys for each stack category
 }
 
 // Format period key based on granularity (extended for daily and yearly)
@@ -366,8 +367,13 @@ export function calculateClaimsOverTime(
   const sortedCategories = Array.from(allCategories)
     .sort((a, b) => (categoryCounts[b] || 0) - (categoryCounts[a] || 0));
 
-  // Show all categories (no "Other" consolidation)
-  const topCategories = sortedCategories;
+  // Limit to top 15 categories, consolidate rest into "Other"
+  const topCategories = groupBy === "none"
+    ? sortedCategories
+    : sortedCategories.slice(0, 15);
+  const otherCategories = groupBy === "none"
+    ? []
+    : sortedCategories.slice(15);
 
   // Convert to array format for chart
   const result: StackedChartDataPoint[] = Object.entries(periodData)
@@ -378,18 +384,41 @@ export function calculateClaimsOverTime(
         total: 0,
       };
 
-      // Add all categories
+      // Add top categories
       for (const category of topCategories) {
         dataPoint[category] = counts[category] || 0;
         dataPoint.total += counts[category] || 0;
+      }
+
+      // Combine remaining into "Other" if needed
+      if (otherCategories.length > 0) {
+        let otherCount = 0;
+        const breakdown: Record<string, number> = {};
+        for (const category of otherCategories) {
+          const count = counts[category] || 0;
+          otherCount += count;
+          if (count > 0) {
+            breakdown[category] = count;
+          }
+        }
+        if (otherCount > 0) {
+          dataPoint["Other"] = otherCount;
+          dataPoint.total += otherCount;
+          dataPoint.otherBreakdown = breakdown;
+        }
       }
 
       return dataPoint;
     })
     .sort((a, b) => a.period.localeCompare(b.period));
 
-  // Final categories list (all categories)
-  return { data: result, categories: topCategories };
+  // Final categories list (top categories + "Other" if needed)
+  const finalCategories = [...topCategories];
+  if (otherCategories.length > 0) {
+    finalCategories.push("Other");
+  }
+
+  return { data: result, categories: finalCategories };
 }
 
 // Combine filter values from multiple form types
