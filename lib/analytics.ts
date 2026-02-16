@@ -239,7 +239,7 @@ export function calculateClaimsPercentageByPeriod(
   const result: ChartDataPoint[] = Object.entries(periodData)
     .map(([periodKey, data]) => ({
       period: periodKey,
-      periodLabel: getPeriodLabel(periodKey, period),
+      periodLabel: getExtendedPeriodLabel(periodKey, period === "weekly" ? "weekly" : "monthly"),
       claimCount: data.claimCount,
       totalExposureDays: data.totalExposureDays,
       claimsPercentage: data.totalExposureDays > 0
