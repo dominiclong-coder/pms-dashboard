@@ -85,8 +85,8 @@ export default function Dashboard() {
   const [filters, setFilters] = useState<FiltersType>({});
   const [claimsOverTimeFilters, setClaimsOverTimeFilters] = useState<FiltersType>({});
   const [dateRange, setDateRange] = useState<DateRange>("1y");
-  const [actionLevelMultiplier, setActionLevelMultiplier] = useState(2);
-  const [alertLevelMultiplier, setAlertLevelMultiplier] = useState(1);
+  const [actionLevelMultiplier, setActionLevelMultiplier] = useState(1.25);
+  const [alertLevelMultiplier, setAlertLevelMultiplier] = useState(0.75);
   const [showControlLimits, setShowControlLimits] = useState(false);
   const [showMeanLine, setShowMeanLine] = useState(false);
   const [showActionLine, setShowActionLine] = useState(false);
@@ -468,7 +468,7 @@ export default function Dashboard() {
                   {/* Action Level Multiplier */}
                   <div className="flex flex-col gap-3">
                     <label className="text-sm text-slate-600">
-                      Action Level (Mean + {actionLevelMultiplier.toFixed(1)}σ)
+                      Action Level (Mean + {actionLevelMultiplier.toFixed(2)}σ)
                     </label>
                     <div className="flex items-center gap-3">
                       <input
@@ -480,8 +480,8 @@ export default function Dashboard() {
                         onChange={(e) => setActionLevelMultiplier(parseFloat(e.target.value))}
                         className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
                       />
-                      <span className="text-sm font-medium text-slate-900 w-8 text-right">
-                        {actionLevelMultiplier.toFixed(1)}σ
+                      <span className="text-sm font-medium text-slate-900 w-12 text-right">
+                        {actionLevelMultiplier.toFixed(2)}σ
                       </span>
                     </div>
                     <span className="text-xs text-slate-500">
@@ -492,7 +492,7 @@ export default function Dashboard() {
                   {/* Alert Level Multiplier */}
                   <div className="flex flex-col gap-3">
                     <label className="text-sm text-slate-600">
-                      Alert Level (Mean + {alertLevelMultiplier.toFixed(1)}σ)
+                      Alert Level (Mean + {alertLevelMultiplier.toFixed(2)}σ)
                     </label>
                     <div className="flex items-center gap-3">
                       <input
@@ -504,8 +504,8 @@ export default function Dashboard() {
                         onChange={(e) => setAlertLevelMultiplier(parseFloat(e.target.value))}
                         className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
                       />
-                      <span className="text-sm font-medium text-slate-900 w-8 text-right">
-                        {alertLevelMultiplier.toFixed(1)}σ
+                      <span className="text-sm font-medium text-slate-900 w-12 text-right">
+                        {alertLevelMultiplier.toFixed(2)}σ
                       </span>
                     </div>
                     <span className="text-xs text-slate-500">
