@@ -166,34 +166,20 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
       );
     }
 
-    // Standard tooltip for regular entries
-    const total = payload.reduce((sum, entry) => sum + (entry.value || 0), 0);
-    return (
-      <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 max-w-xs">
-        <p className="font-medium text-slate-900 mb-2">{label}</p>
-        <div className="space-y-1 max-h-48 overflow-y-auto">
-          {payload
-            .filter((entry) => entry.value > 0)
-            .sort((a, b) => b.value - a.value)
-            .map((entry, index) => (
-              <div key={index} className="flex items-center justify-between gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-sm"
-                    style={{ backgroundColor: entry.color }}
-                  />
-                  <span className="text-slate-600 truncate max-w-[150px]">{entry.name}</span>
-                </div>
-                <span className="font-medium text-slate-900">{entry.value.toLocaleString()}</span>
-              </div>
-            ))}
+    // For individual category lines, show only that entry
+    if (payload.length === 1 && payload[0].value) {
+      return (
+        <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 max-w-xs">
+          <p className="font-medium text-slate-900 mb-1">{label}</p>
+          <p className="text-sm text-slate-600">
+            <span className="font-medium">{payload[0].name}:</span> {payload[0].value?.toLocaleString()}
+          </p>
         </div>
-        <div className="border-t border-slate-200 mt-2 pt-2 flex justify-between text-sm font-medium">
-          <span className="text-slate-600">Total</span>
-          <span className="text-slate-900">{total.toLocaleString()}</span>
-        </div>
-      </div>
-    );
+      );
+    }
+
+    // Fallback: shouldn't happen with current implementation
+    return null;
   }
   return null;
 }
