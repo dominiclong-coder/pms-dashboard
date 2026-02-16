@@ -134,48 +134,23 @@ interface CustomTooltipProps {
 
 function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (active && payload && payload.length) {
-    // Check if "Other" is in the payload and has breakdown data
-    const otherEntry = payload.find((entry) => entry.name === "Other");
-    const otherBreakdown = otherEntry?.payload?.otherBreakdown as Record<string, number> | undefined;
+    // Show all categories for this time period, sorted by value descending
+    const sortedEntries = payload
+      .filter((entry) => entry.value && entry.value > 0)
+      .sort((a, b) => (b.value || 0) - (a.value || 0));
 
-    // If showing "Other" with breakdown, show the breakdown instead of regular entries
-    if (otherEntry && otherBreakdown && Object.keys(otherBreakdown).length > 0) {
+    if (sortedEntries.length > 0) {
       return (
         <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 max-w-xs">
           <p className="font-medium text-slate-900 mb-2">{label}</p>
-          <p className="text-xs font-semibold text-slate-600 mb-2">Other Categories:</p>
-          <div className="space-y-1 max-h-48 overflow-y-auto">
-            {Object.entries(otherBreakdown)
-              .sort(([, a], [, b]) => b - a)
-              .map(([category, count]) => (
-                <div
-                  key={category}
-                  className="flex items-center justify-between gap-4 text-sm"
-                >
-                  <span className="text-slate-600 truncate max-w-[150px]">{category}</span>
-                  <span className="font-medium text-slate-900">{count.toLocaleString()}</span>
-                </div>
-              ))}
+          <div className="space-y-1 max-h-60 overflow-y-auto">
+            {sortedEntries.map((entry, index) => (
+              <div key={index} className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-slate-600 truncate max-w-[150px]">{entry.name}</span>
+                <span className="font-medium text-slate-900">{entry.value?.toLocaleString()}</span>
+              </div>
+            ))}
           </div>
-          <div className="border-t border-slate-200 mt-2 pt-2 text-sm font-medium">
-            <span className="text-slate-900">
-              Other Total: {otherEntry.value?.toLocaleString()}
-            </span>
-          </div>
-        </div>
-      );
-    }
-
-    // For regular category lines, show just that entry
-    // Recharts will only include the hovered line in the payload
-    if (payload.length > 0) {
-      const entry = payload[0];
-      return (
-        <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 max-w-xs">
-          <p className="font-medium text-slate-900 mb-1">{label}</p>
-          <p className="text-sm text-slate-600">
-            <span className="font-medium">{entry.name}:</span> {entry.value?.toLocaleString()}
-          </p>
         </div>
       );
     }
