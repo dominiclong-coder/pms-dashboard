@@ -296,7 +296,7 @@ export function ClaimsOverTimeChart({
         </div>
       </div>
 
-      <div className="h-screen">
+      <div className="h-96">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
