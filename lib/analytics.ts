@@ -343,13 +343,8 @@ export function calculateClaimsOverTime(
   const sortedCategories = Array.from(allCategories)
     .sort((a, b) => (categoryCounts[b] || 0) - (categoryCounts[a] || 0));
 
-  // If groupBy is "none", keep single category; otherwise limit to top 10
-  const topCategories = groupBy === "none"
-    ? sortedCategories
-    : sortedCategories.slice(0, 10);
-  const otherCategories = groupBy === "none"
-    ? []
-    : sortedCategories.slice(10);
+  // Show all categories (no "Other" consolidation)
+  const topCategories = sortedCategories;
 
   // Convert to array format for chart
   const result: StackedChartDataPoint[] = Object.entries(periodData)
@@ -360,35 +355,18 @@ export function calculateClaimsOverTime(
         total: 0,
       };
 
-      // Add top categories
+      // Add all categories
       for (const category of topCategories) {
         dataPoint[category] = counts[category] || 0;
         dataPoint.total += counts[category] || 0;
-      }
-
-      // Combine remaining into "Other" if needed
-      if (otherCategories.length > 0) {
-        let otherCount = 0;
-        for (const category of otherCategories) {
-          otherCount += counts[category] || 0;
-        }
-        if (otherCount > 0) {
-          dataPoint["Other"] = otherCount;
-          dataPoint.total += otherCount;
-        }
       }
 
       return dataPoint;
     })
     .sort((a, b) => a.period.localeCompare(b.period));
 
-  // Final categories list (top categories + "Other" if needed)
-  const finalCategories = [...topCategories];
-  if (otherCategories.length > 0) {
-    finalCategories.push("Other");
-  }
-
-  return { data: result, categories: finalCategories };
+  // Final categories list (all categories)
+  return { data: result, categories: topCategories };
 }
 
 // Combine filter values from multiple form types

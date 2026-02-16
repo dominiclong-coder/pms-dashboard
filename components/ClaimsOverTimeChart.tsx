@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from "react";
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -46,6 +46,9 @@ interface ClaimsOverTimeChartProps {
   baseColor?: string;
   claimType: "warranty" | "return";
   timePeriod: TimePeriod;
+  groupBy: GroupBy;
+  visibleCategories: Set<string>;
+  onVisibleCategoriesChange: (categories: Set<string>) => void;
 }
 
 interface ChartControlsProps {
@@ -208,6 +211,9 @@ export function ClaimsOverTimeChart({
   baseColor = "#3b82f6",
   claimType,
   timePeriod,
+  groupBy,
+  visibleCategories,
+  onVisibleCategoriesChange,
 }: ClaimsOverTimeChartProps) {
   // Calculate summary stats
   const totalClaims = useMemo(
@@ -265,9 +271,42 @@ export function ClaimsOverTimeChart({
         </div>
       </div>
 
+      {/* Category Visibility Toggles */}
+      {groupBy !== "none" && categories.length > 0 && (
+        <div className="mb-4 p-3 bg-white border border-slate-200 rounded-lg">
+          <span className="text-sm font-semibold text-slate-900 block mb-2">
+            Show Categories:
+          </span>
+          <div className="flex flex-wrap gap-3 max-h-32 overflow-y-auto">
+            {categories.map((category) => (
+              <label
+                key={category}
+                className="flex items-center gap-2 cursor-pointer whitespace-nowrap"
+              >
+                <input
+                  type="checkbox"
+                  checked={visibleCategories.has(category)}
+                  onChange={(e) => {
+                    const newVisible = new Set(visibleCategories);
+                    if (e.target.checked) {
+                      newVisible.add(category);
+                    } else {
+                      newVisible.delete(category);
+                    }
+                    onVisibleCategoriesChange(newVisible);
+                  }}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm text-slate-600">{category}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className={needsMoreHeight ? "h-96" : "h-80"}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart
+          <LineChart
             data={chartData}
             margin={{
               top: 5,
@@ -303,16 +342,24 @@ export function ClaimsOverTimeChart({
                 )}
               />
             )}
-            {categories.map((category, index) => (
-              <Bar
-                key={category}
-                dataKey={category}
-                stackId="claims"
-                fill={getCategoryColor(category, index)}
-                name={category}
-              />
-            ))}
-          </BarChart>
+            {categories.map((category, index) => {
+              if (!visibleCategories.has(category)) {
+                return null; // Skip hidden categories
+              }
+              return (
+                <Line
+                  key={category}
+                  type="monotone"
+                  dataKey={category}
+                  stroke={getCategoryColor(category, index)}
+                  name={category}
+                  dot={false}
+                  strokeWidth={2}
+                  isAnimationActive={true}
+                />
+              );
+            })}
+          </LineChart>
         </ResponsiveContainer>
       </div>
     </div>
@@ -397,6 +444,9 @@ export function ClaimsOverTimeWithControls({
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("monthly");
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
   const [dateRange, setDateRange] = useState<DateRange>("1y");
+  const [visibleCategories, setVisibleCategories] = useState<Set<string>>(
+    new Set()
+  );
 
   // Show date range selector for daily and weekly views
   const showDateRange = timePeriod === "daily" || timePeriod === "weekly";
@@ -411,6 +461,11 @@ export function ClaimsOverTimeWithControls({
     () => calculateClaimsOverTime(filteredRegistrations, timePeriod, groupBy, claimType),
     [filteredRegistrations, timePeriod, groupBy, claimType, calculateClaimsOverTime]
   );
+
+  // Update visible categories when categories change
+  useMemo(() => {
+    setVisibleCategories(new Set(categories));
+  }, [categories]);
 
   // Apply date range filter for daily/weekly
   const data = useMemo(() => {
@@ -441,6 +496,9 @@ export function ClaimsOverTimeWithControls({
         baseColor={baseColor}
         claimType={claimType}
         timePeriod={timePeriod}
+        groupBy={groupBy}
+        visibleCategories={visibleCategories}
+        onVisibleCategoriesChange={setVisibleCategories}
       />
     </div>
   );
