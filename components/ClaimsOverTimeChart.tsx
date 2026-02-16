@@ -50,7 +50,6 @@ interface ChartControlsProps {
   groupBy: GroupBy;
   startDate: string;
   endDate: string;
-  showDateRange: boolean;
   onTimePeriodChange: (period: TimePeriod) => void;
   onGroupByChange: (groupBy: GroupBy) => void;
   onStartDateChange: (date: string) => void;
@@ -62,7 +61,6 @@ function ChartControls({
   groupBy,
   startDate,
   endDate,
-  showDateRange,
   onTimePeriodChange,
   onGroupByChange,
   onStartDateChange,
@@ -90,25 +88,23 @@ function ChartControls({
         </div>
       </div>
 
-      {/* Date Range Selector - only show for daily/weekly */}
-      {showDateRange && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-600">Date Range:</span>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => onStartDateChange(e.target.value)}
-            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <span className="text-sm text-slate-600">to</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => onEndDateChange(e.target.value)}
-            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      )}
+      {/* Date Range Selector - always shown */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-slate-600">Date Range:</span>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => onStartDateChange(e.target.value)}
+          className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <span className="text-sm text-slate-600">to</span>
+        <input
+          type="date"
+          value={endDate}
+          onChange={(e) => onEndDateChange(e.target.value)}
+          className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
 
       {/* Group By Selector */}
       <div className="flex items-center gap-2">
@@ -417,9 +413,6 @@ export function ClaimsOverTimeWithControls({
   const [startDate, setStartDate] = useState<string>(defaultStartDate);
   const [endDate, setEndDate] = useState<string>(defaultEndDate);
 
-  // Show date range selector for daily and weekly views
-  const showDateRange = timePeriod === "daily" || timePeriod === "weekly";
-
   // Apply filters to registrations
   const filteredRegistrations = useMemo(
     () => applyFilters(registrations, filters),
@@ -431,11 +424,10 @@ export function ClaimsOverTimeWithControls({
     [filteredRegistrations, timePeriod, groupBy, claimType, calculateClaimsOverTime]
   );
 
-  // Apply date range filter for daily/weekly
+  // Apply date range filter regardless of time period selection
   const data = useMemo(() => {
-    if (!showDateRange) return rawData;
     return filterByDateRange(rawData, startDate, endDate);
-  }, [rawData, startDate, endDate, showDateRange]);
+  }, [rawData, startDate, endDate]);
 
   return (
     <div>
@@ -450,7 +442,6 @@ export function ClaimsOverTimeWithControls({
         groupBy={groupBy}
         startDate={startDate}
         endDate={endDate}
-        showDateRange={showDateRange}
         onTimePeriodChange={setTimePeriod}
         onGroupByChange={setGroupBy}
         onStartDateChange={setStartDate}
