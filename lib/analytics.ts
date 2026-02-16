@@ -48,6 +48,26 @@ function getWeekNumber(date: Date): { year: number; week: number } {
   return { year: d.getUTCFullYear(), week };
 }
 
+// Get the first day of a week (Monday) from year and week number
+function getFirstDayOfWeek(year: number, week: number): Date {
+  const jan1 = new Date(year, 0, 1);
+  const daysOffset = (week - 1) * 7;
+  const firstDay = new Date(jan1.getTime() + daysOffset * 24 * 60 * 60 * 1000);
+
+  // Find the Monday of this week (0 = Sunday, need to go back to Monday)
+  const dayOfWeek = firstDay.getDay();
+  const monday = new Date(firstDay);
+  if (dayOfWeek === 0) {
+    // Sunday - go back 6 days
+    monday.setDate(monday.getDate() - 6);
+  } else if (dayOfWeek !== 1) {
+    // Not Monday - go back to previous Monday
+    monday.setDate(monday.getDate() - (dayOfWeek - 1));
+  }
+
+  return monday;
+}
+
 // Format period key based on granularity
 function getPeriodKey(date: Date, period: "weekly" | "monthly"): string {
   if (period === "monthly") {
@@ -273,7 +293,10 @@ function getExtendedPeriodLabel(periodKey: string, period: TimePeriod): string {
     }
     case "weekly": {
       const [year, weekStr] = periodKey.split("-W");
-      return `W${weekStr} ${year}`;
+      const week = parseInt(weekStr);
+      const firstDay = getFirstDayOfWeek(parseInt(year), week);
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${monthNames[firstDay.getMonth()]} ${firstDay.getDate()}, ${firstDay.getFullYear()}`;
     }
     case "monthly": {
       const [year, month] = periodKey.split("-");

@@ -190,7 +190,7 @@ function getTickInterval(dataLength: number, timePeriod: TimePeriod): number | "
   return Math.floor(dataLength / 8) - 1;
 }
 
-// Format shorter labels for daily view
+// Format shorter labels for daily/weekly view
 function getShortLabel(periodLabel: string, timePeriod: TimePeriod): string {
   if (timePeriod === "daily") {
     // "Jan 15, 2024" -> "Jan 15"
@@ -198,8 +198,8 @@ function getShortLabel(periodLabel: string, timePeriod: TimePeriod): string {
     return parts[0] || periodLabel;
   }
   if (timePeriod === "weekly") {
-    // "W01 2024" -> "W01"
-    const parts = periodLabel.split(" ");
+    // "Jan 23, 2025" -> "Jan 23" (show just month and day)
+    const parts = periodLabel.split(", ");
     return parts[0] || periodLabel;
   }
   return periodLabel;
