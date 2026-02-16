@@ -166,17 +166,15 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
       );
     }
 
-    // For individual category lines, show the entry with the highest value
-    // (This is typically the line the user is hovering over in a line chart)
-    const validEntries = payload.filter((entry) => entry.value && entry.value > 0);
-    if (validEntries.length > 0) {
-      // Sort by value descending and show the highest
-      const topEntry = validEntries.sort((a, b) => (b.value || 0) - (a.value || 0))[0];
+    // For regular category lines, show just that entry
+    // Recharts will only include the hovered line in the payload
+    if (payload.length > 0) {
+      const entry = payload[0];
       return (
         <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 max-w-xs">
           <p className="font-medium text-slate-900 mb-1">{label}</p>
           <p className="text-sm text-slate-600">
-            <span className="font-medium">{topEntry.name}:</span> {topEntry.value?.toLocaleString()}
+            <span className="font-medium">{entry.name}:</span> {entry.value?.toLocaleString()}
           </p>
         </div>
       );
