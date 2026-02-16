@@ -22,6 +22,9 @@ interface ClaimsChartProps {
     stdDev: number;
     actionLevel: number;
     alertLevel: number;
+    showMean?: boolean;
+    showAction?: boolean;
+    showAlert?: boolean;
   };
 }
 
@@ -112,45 +115,51 @@ export function ClaimsChart({ title, data, color = "#3b82f6", controlLimits }: C
             />
             {controlLimits && (
               <>
-                <ReferenceLine
-                  y={controlLimits.mean}
-                  stroke="#64748b"
-                  strokeWidth={2}
-                  strokeDasharray="0"
-                  label={{
-                    value: `Mean: ${controlLimits.mean.toFixed(3)}%`,
-                    position: "right" as const,
-                    fill: "#64748b",
-                    fontSize: 11,
-                    offset: 5,
-                  }}
-                />
-                <ReferenceLine
-                  y={controlLimits.actionLevel}
-                  stroke="#f59e0b"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  label={{
-                    value: `Action: ${controlLimits.actionLevel.toFixed(3)}%`,
-                    position: "right" as const,
-                    fill: "#f59e0b",
-                    fontSize: 11,
-                    offset: 5,
-                  }}
-                />
-                <ReferenceLine
-                  y={controlLimits.alertLevel}
-                  stroke="#ef4444"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  label={{
-                    value: `Alert: ${controlLimits.alertLevel.toFixed(3)}%`,
-                    position: "right" as const,
-                    fill: "#ef4444",
-                    fontSize: 11,
-                    offset: 5,
-                  }}
-                />
+                {controlLimits.showMean && (
+                  <ReferenceLine
+                    y={controlLimits.mean}
+                    stroke="#64748b"
+                    strokeWidth={2}
+                    strokeDasharray="0"
+                    label={{
+                      value: `Mean: ${controlLimits.mean.toFixed(3)}%`,
+                      position: "right" as const,
+                      fill: "#64748b",
+                      fontSize: 11,
+                      offset: 5,
+                    }}
+                  />
+                )}
+                {controlLimits.showAction && (
+                  <ReferenceLine
+                    y={controlLimits.actionLevel}
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    label={{
+                      value: `Action: ${controlLimits.actionLevel.toFixed(3)}%`,
+                      position: "right" as const,
+                      fill: "#f59e0b",
+                      fontSize: 11,
+                      offset: 5,
+                    }}
+                  />
+                )}
+                {controlLimits.showAlert && (
+                  <ReferenceLine
+                    y={controlLimits.alertLevel}
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    label={{
+                      value: `Alert: ${controlLimits.alertLevel.toFixed(3)}%`,
+                      position: "right" as const,
+                      fill: "#ef4444",
+                      fontSize: 11,
+                      offset: 5,
+                    }}
+                  />
+                )}
               </>
             )}
           </LineChart>

@@ -87,7 +87,10 @@ export default function Dashboard() {
   const [dateRange, setDateRange] = useState<DateRange>("1y");
   const [actionLevelMultiplier, setActionLevelMultiplier] = useState(1);
   const [alertLevelMultiplier, setAlertLevelMultiplier] = useState(2);
-  const [showControlLimits, setShowControlLimits] = useState(true);
+  const [showControlLimits, setShowControlLimits] = useState(false);
+  const [showMeanLine, setShowMeanLine] = useState(false);
+  const [showActionLine, setShowActionLine] = useState(false);
+  const [showAlertLine, setShowAlertLine] = useState(true);
 
   // Data state
   const [registrationsByForm, setRegistrationsByForm] = useState<Record<string, Registration[]>>({});
@@ -258,6 +261,9 @@ export default function Dashboard() {
     setClaimType(type);
     setFilters({});
     setClaimsOverTimeFilters({});
+    setShowMeanLine(false);
+    setShowActionLine(false);
+    setShowAlertLine(true);
   };
 
   // Loading state
@@ -469,7 +475,7 @@ export default function Dashboard() {
                         type="range"
                         min="0.5"
                         max="3"
-                        step="0.5"
+                        step="0.05"
                         value={actionLevelMultiplier}
                         onChange={(e) => setActionLevelMultiplier(parseFloat(e.target.value))}
                         className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
@@ -493,7 +499,7 @@ export default function Dashboard() {
                         type="range"
                         min="0.5"
                         max="3"
-                        step="0.5"
+                        step="0.05"
                         value={alertLevelMultiplier}
                         onChange={(e) => setAlertLevelMultiplier(parseFloat(e.target.value))}
                         className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
@@ -527,20 +533,62 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
+
+                {/* Line Visibility Toggles */}
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <span className="text-xs text-slate-500 block mb-3">Show Reference Lines:</span>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showMeanLine}
+                        onChange={(e) => setShowMeanLine(e.target.checked)}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm text-slate-600">Mean</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showActionLine}
+                        onChange={(e) => setShowActionLine(e.target.checked)}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm text-slate-600">Action Level</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showAlertLine}
+                        onChange={(e) => setShowAlertLine(e.target.checked)}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm text-slate-600">Alert Level</span>
+                    </label>
+                  </div>
+                </div>
               </>
             )}
           </div>
         )}
 
         {/* Claims % Chart */}
-        {hasData && (
-          <ClaimsChart
-            title={`${claimTypeLabel} % of Exposure Days`}
-            data={chartData}
-            color={chartColor}
-            controlLimits={showControlLimits ? controlLimits : undefined}
-          />
-        )}
+        {hasData && (() => {
+          const visibleControlLimits = controlLimits && {
+            ...controlLimits,
+            showMean: showMeanLine,
+            showAction: showActionLine,
+            showAlert: showAlertLine,
+          };
+          return (
+            <ClaimsChart
+              title={`${claimTypeLabel} % of Exposure Days`}
+              data={chartData}
+              color={chartColor}
+              controlLimits={visibleControlLimits}
+            />
+          );
+        })()}
 
         {/* Claims Over Time Chart */}
         {hasData && (
