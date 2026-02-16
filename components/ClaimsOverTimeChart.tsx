@@ -37,9 +37,6 @@ const COLORS = [
   "#94a3b8", // slate (for "Other")
 ];
 
-// Date range options for daily/weekly views
-type DateRange = "30d" | "90d" | "180d" | "1y" | "all";
-
 interface ClaimsOverTimeChartProps {
   data: StackedChartDataPoint[];
   categories: string[];
@@ -51,21 +48,25 @@ interface ClaimsOverTimeChartProps {
 interface ChartControlsProps {
   timePeriod: TimePeriod;
   groupBy: GroupBy;
-  dateRange: DateRange;
+  startDate: string;
+  endDate: string;
   showDateRange: boolean;
   onTimePeriodChange: (period: TimePeriod) => void;
   onGroupByChange: (groupBy: GroupBy) => void;
-  onDateRangeChange: (range: DateRange) => void;
+  onStartDateChange: (date: string) => void;
+  onEndDateChange: (date: string) => void;
 }
 
 function ChartControls({
   timePeriod,
   groupBy,
-  dateRange,
+  startDate,
+  endDate,
   showDateRange,
   onTimePeriodChange,
   onGroupByChange,
-  onDateRangeChange,
+  onStartDateChange,
+  onEndDateChange,
 }: ChartControlsProps) {
   return (
     <div className="flex flex-wrap items-center gap-4 mb-4">
@@ -92,28 +93,20 @@ function ChartControls({
       {/* Date Range Selector - only show for daily/weekly */}
       {showDateRange && (
         <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-600">Range:</span>
-          <div className="flex bg-slate-100 rounded-lg p-1">
-            {([
-              { value: "30d", label: "30d" },
-              { value: "90d", label: "90d" },
-              { value: "180d", label: "6m" },
-              { value: "1y", label: "1y" },
-              { value: "all", label: "All" },
-            ] as { value: DateRange; label: string }[]).map((option) => (
-              <button
-                key={option.value}
-                onClick={() => onDateRangeChange(option.value)}
-                className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${
-                  dateRange === option.value
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          <span className="text-sm text-slate-600">Date Range:</span>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => onStartDateChange(e.target.value)}
+            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <span className="text-sm text-slate-600">to</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => onEndDateChange(e.target.value)}
+            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
       )}
 
@@ -353,46 +346,30 @@ export function ClaimsOverTimeChart({
   );
 }
 
-// Filter data by date range
+// Filter data by custom date range
 function filterByDateRange(
   data: StackedChartDataPoint[],
-  dateRange: DateRange
+  startDate: string,
+  endDate: string
 ): StackedChartDataPoint[] {
-  if (dateRange === "all" || data.length === 0) return data;
+  if (!startDate || !endDate || data.length === 0) return data;
 
-  const now = new Date();
-  let cutoffDate: Date;
-
-  switch (dateRange) {
-    case "30d":
-      cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      break;
-    case "90d":
-      cutoffDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      break;
-    case "180d":
-      cutoffDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
-      break;
-    case "1y":
-      cutoffDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-      break;
-    default:
-      return data;
-  }
-
-  const cutoffStr = cutoffDate.toISOString().split("T")[0];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
 
   return data.filter((d) => {
-    // Period is in format "2024-01-15" for daily, "2024-W01" for weekly, "2024-01" for monthly
     const period = d.period;
+
     if (period.includes("W")) {
-      // Weekly: "2024-W01" - approximate by checking year
+      // Weekly: "2024-W01" - get approximate date
       const [year, week] = period.split("-W");
       const weekDate = getDateFromWeek(parseInt(year), parseInt(week));
-      return weekDate >= cutoffDate;
+      return weekDate >= start && weekDate <= end;
     }
-    // Daily or monthly: compare directly
-    return period >= cutoffStr.substring(0, period.length);
+
+    // Daily or monthly: parse period as date
+    const periodDate = new Date(period);
+    return periodDate >= start && periodDate <= end;
   });
 }
 
@@ -430,7 +407,15 @@ export function ClaimsOverTimeWithControls({
 }: ClaimsOverTimeWithControlsProps) {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("monthly");
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
-  const [dateRange, setDateRange] = useState<DateRange>("1y");
+
+  // Initialize default date range (last 1 year from today)
+  const today = new Date();
+  const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+  const defaultStartDate = oneYearAgo.toISOString().split("T")[0];
+  const defaultEndDate = today.toISOString().split("T")[0];
+
+  const [startDate, setStartDate] = useState<string>(defaultStartDate);
+  const [endDate, setEndDate] = useState<string>(defaultEndDate);
 
   // Show date range selector for daily and weekly views
   const showDateRange = timePeriod === "daily" || timePeriod === "weekly";
@@ -449,8 +434,8 @@ export function ClaimsOverTimeWithControls({
   // Apply date range filter for daily/weekly
   const data = useMemo(() => {
     if (!showDateRange) return rawData;
-    return filterByDateRange(rawData, dateRange);
-  }, [rawData, dateRange, showDateRange]);
+    return filterByDateRange(rawData, startDate, endDate);
+  }, [rawData, startDate, endDate, showDateRange]);
 
   return (
     <div>
@@ -463,11 +448,13 @@ export function ClaimsOverTimeWithControls({
       <ChartControls
         timePeriod={timePeriod}
         groupBy={groupBy}
-        dateRange={dateRange}
+        startDate={startDate}
+        endDate={endDate}
         showDateRange={showDateRange}
         onTimePeriodChange={setTimePeriod}
         onGroupByChange={setGroupBy}
-        onDateRangeChange={setDateRange}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
       />
       <ClaimsOverTimeChart
         data={data}
