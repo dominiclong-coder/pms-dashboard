@@ -166,19 +166,22 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
       );
     }
 
-    // For individual category lines, show only that entry
-    if (payload.length === 1 && payload[0].value) {
+    // For individual category lines, show the entry with the highest value
+    // (This is typically the line the user is hovering over in a line chart)
+    const validEntries = payload.filter((entry) => entry.value && entry.value > 0);
+    if (validEntries.length > 0) {
+      // Sort by value descending and show the highest
+      const topEntry = validEntries.sort((a, b) => (b.value || 0) - (a.value || 0))[0];
       return (
         <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 max-w-xs">
           <p className="font-medium text-slate-900 mb-1">{label}</p>
           <p className="text-sm text-slate-600">
-            <span className="font-medium">{payload[0].name}:</span> {payload[0].value?.toLocaleString()}
+            <span className="font-medium">{topEntry.name}:</span> {topEntry.value?.toLocaleString()}
           </p>
         </div>
       );
     }
 
-    // Fallback: shouldn't happen with current implementation
     return null;
   }
   return null;
@@ -300,7 +303,7 @@ export function ClaimsOverTimeChart({
               tickFormatter={(value) => value.toLocaleString()}
               width={50}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: "3 3" }} />
             {categories.length > 1 && (
               <Legend
                 wrapperStyle={{ paddingTop: "10px" }}
@@ -319,6 +322,7 @@ export function ClaimsOverTimeChart({
                 dot={false}
                 strokeWidth={2}
                 isAnimationActive={true}
+                activeDot={{ r: 5, strokeWidth: 2 }}
               />
             ))}
           </LineChart>
