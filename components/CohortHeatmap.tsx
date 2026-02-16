@@ -122,13 +122,13 @@ export function CohortHeatmap({ data, maxMonths }: CohortHeatmapProps) {
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className="sticky left-0 bg-white z-10 p-3 border-b-2 border-slate-300 text-left font-semibold text-slate-700 min-w-[120px]">
+              <th className="sticky left-0 bg-white z-10 px-2 py-1.5 border-b-2 border-slate-300 text-left font-semibold text-slate-700 text-xs min-w-[110px]">
                 Purchase Month
               </th>
               {months.map((month) => (
                 <th
                   key={month}
-                  className="p-3 border-b-2 border-slate-300 text-center font-semibold text-slate-700 min-w-[80px]"
+                  className="px-2 py-1.5 border-b-2 border-slate-300 text-center font-semibold text-slate-700 text-xs min-w-[70px]"
                 >
                   {month}
                 </th>
@@ -142,7 +142,7 @@ export function CohortHeatmap({ data, maxMonths }: CohortHeatmapProps) {
 
               return (
                 <tr key={cohort} className="hover:bg-slate-50">
-                  <td className="sticky left-0 bg-white z-10 p-3 border-b border-slate-200 font-medium text-slate-700">
+                  <td className="sticky left-0 bg-white z-10 px-2 py-1.5 border-b border-slate-200 font-medium text-slate-700 text-xs">
                     {firstPoint?.cohortLabel || cohort}
                   </td>
                   {months.map((month) => {
@@ -152,7 +152,7 @@ export function CohortHeatmap({ data, maxMonths }: CohortHeatmapProps) {
                       return (
                         <td
                           key={month}
-                          className="p-3 border-b border-slate-200 text-center text-slate-400 text-sm"
+                          className="px-2 py-1.5 border-b border-slate-200 text-center text-slate-400 text-xs"
                         >
                           -
                         </td>
@@ -166,8 +166,8 @@ export function CohortHeatmap({ data, maxMonths }: CohortHeatmapProps) {
                     return (
                       <td
                         key={month}
-                        className="p-3 border-b border-slate-200 text-center text-sm font-medium cursor-default transition-opacity hover:opacity-80"
-                        style={{ backgroundColor: bgColor, color: textColor }}
+                        className="px-2 py-1.5 border-b border-slate-200 text-center text-xs font-medium cursor-default transition-opacity hover:opacity-80"
+                        style={{ backgroundColor: bgColor, color: "#000000" }}
                         onMouseEnter={(e) => handleMouseEnter(cohort, month, e)}
                         onMouseMove={handleMouseMove}
                         onMouseLeave={handleMouseLeave}
