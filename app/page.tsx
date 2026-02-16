@@ -85,8 +85,8 @@ export default function Dashboard() {
   const [filters, setFilters] = useState<FiltersType>({});
   const [claimsOverTimeFilters, setClaimsOverTimeFilters] = useState<FiltersType>({});
   const [dateRange, setDateRange] = useState<DateRange>("1y");
-  const [actionLevelMultiplier, setActionLevelMultiplier] = useState(1);
-  const [alertLevelMultiplier, setAlertLevelMultiplier] = useState(2);
+  const [actionLevelMultiplier, setActionLevelMultiplier] = useState(2);
+  const [alertLevelMultiplier, setAlertLevelMultiplier] = useState(1);
   const [showControlLimits, setShowControlLimits] = useState(false);
   const [showMeanLine, setShowMeanLine] = useState(false);
   const [showActionLine, setShowActionLine] = useState(false);
@@ -515,25 +515,6 @@ export default function Dashboard() {
                 </div>
                 
                 {/* Statistics Display */}
-                <div className="mt-4 pt-4 border-t border-slate-200">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <span className="text-xs text-slate-500">Mean</span>
-                      <div className="text-sm font-semibold text-slate-900">{controlLimits.mean.toFixed(3)}%</div>
-                    </div>
-                    <div>
-                      <span className="text-xs text-slate-500">Std Dev</span>
-                      <div className="text-sm font-semibold text-slate-900">{controlLimits.stdDev.toFixed(3)}%</div>
-                    </div>
-                    <div>
-                      <span className="text-xs text-slate-500">Sample Size</span>
-                      <div className="text-sm font-semibold text-slate-900">
-                        {calculateClaimsPercentageByPeriod(registrations, period, claimType).length} periods
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Line Visibility Toggles */}
                 <div className="mt-4 pt-4 border-t border-slate-200">
                   <span className="text-xs text-slate-500 block mb-3">Show Reference Lines:</span>
