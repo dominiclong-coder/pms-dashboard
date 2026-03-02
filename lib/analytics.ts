@@ -472,15 +472,20 @@ export function extractProductType(productName: string | undefined): string {
   return "Other";
 }
 
-// Calculate months between two dates
+// Calculate months between two dates using DATEDIF logic (complete months elapsed)
 function calculateMonthsBetween(startDate: string, endDate: string): number {
   const start = new Date(startDate);
   const end = new Date(endDate);
 
-  const yearDiff = end.getFullYear() - start.getFullYear();
-  const monthDiff = end.getMonth() - start.getMonth();
+  let months = (end.getFullYear() - start.getFullYear()) * 12;
+  months += end.getMonth() - start.getMonth();
 
-  return yearDiff * 12 + monthDiff;
+  // Only count if the day has passed in the end month
+  if (end.getDate() < start.getDate()) {
+    months--;
+  }
+
+  return Math.max(0, months);
 }
 
 // Calculate cohort survival analysis data
