@@ -50,6 +50,7 @@ export interface FilterValues {
 export interface PurchaseVolume {
   yearMonth: string;        // "2024-01" format
   product: string;          // "Dental Pod Go", "All Products", etc.
+  lot: string | null;       // "202503-DP" | null (null for pre-June 2025 orders)
   purchaseCount: number;    // Number of units sold
 }
 

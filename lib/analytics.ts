@@ -18,6 +18,7 @@ export interface FilterValues {
   reasons: string[];
   subReasons: string[];
   purchaseChannels: string[];
+  lots: string[];
 }
 
 export interface Filters {
@@ -27,6 +28,13 @@ export interface Filters {
   reasons?: string[];
   subReasons?: string[];
   purchaseChannels?: string[];
+  lots?: string[];
+}
+
+/** Extract the lot number a customer entered (first serial number, uppercased). */
+function getLotFromRegistration(reg: Registration): string | null {
+  const sn = reg.serialNumbers?.[0]?.trim();
+  return sn ? sn.toUpperCase() : null;
 }
 
 // Calculate days between two dates
@@ -100,6 +108,7 @@ export function extractFilterValues(registrations: Registration[]): FilterValues
   const reasons = new Set<string>();
   const subReasons = new Set<string>();
   const purchaseChannels = new Set<string>();
+  const lots = new Set<string>();
 
   for (const reg of registrations) {
     if (reg.productName) productNames.add(reg.productName);
@@ -118,6 +127,8 @@ export function extractFilterValues(registrations: Registration[]): FilterValues
       if (subReason) subReasons.add(subReason);
       if (channel) purchaseChannels.add(channel);
     }
+    const lot = getLotFromRegistration(reg);
+    if (lot) lots.add(lot);
   }
 
   return {
@@ -127,6 +138,7 @@ export function extractFilterValues(registrations: Registration[]): FilterValues
     reasons: Array.from(reasons).sort(),
     subReasons: Array.from(subReasons).sort(),
     purchaseChannels: Array.from(purchaseChannels).sort(),
+    lots: Array.from(lots).sort(),
   };
 }
 
@@ -174,6 +186,14 @@ export function applyFilters(registrations: Registration[], filters: Filters): R
     if (filters.purchaseChannels && filters.purchaseChannels.length > 0) {
       const channel = reg.fieldData?.["where-did-you-purchase-this-product-from-"] as string;
       if (!channel || !filters.purchaseChannels.includes(channel)) {
+        return false;
+      }
+    }
+
+    // Lot filter (from serialNumbers[0])
+    if (filters.lots && filters.lots.length > 0) {
+      const lot = getLotFromRegistration(reg);
+      if (!lot || !filters.lots.includes(lot)) {
         return false;
       }
     }
@@ -430,6 +450,7 @@ export function combineFilterValues(filterValuesArray: FilterValues[]): FilterVa
     reasons: [],
     subReasons: [],
     purchaseChannels: [],
+    lots: [],
   };
 
   for (const fv of filterValuesArray) {
@@ -439,6 +460,7 @@ export function combineFilterValues(filterValuesArray: FilterValues[]): FilterVa
     combined.reasons = [...new Set([...combined.reasons, ...fv.reasons])].sort();
     combined.subReasons = [...new Set([...combined.subReasons, ...fv.subReasons])].sort();
     combined.purchaseChannels = [...new Set([...combined.purchaseChannels, ...fv.purchaseChannels])].sort();
+    combined.lots = [...new Set([...combined.lots, ...fv.lots])].sort();
   }
 
   return combined;
@@ -495,9 +517,10 @@ export function calculateCohortSurvival(
   productFilter: string,
   startMonth: string,      // "2024-01"
   endMonth: string,        // "2024-12"
-  claimType: "warranty" | "return"
+  claimType: "warranty" | "return",
+  lotFilter?: string       // e.g. "202503-DP" — filters both claims and purchase volumes
 ): CohortDataPoint[] {
-  // 1. Filter registrations by valid exposure and product
+  // 1. Filter registrations by valid exposure, product, and optional lot
   const validRegistrations = registrations.filter((reg) => {
     // Require shopifyOrderCreatedAt - exclude if not present
     if (!reg.shopifyOrderCreatedAt || !reg.createdAt) return false;
@@ -530,6 +553,12 @@ export function calculateCohortSurvival(
     } else {
       // Filter for specific product
       if (productType !== productFilter) return false;
+    }
+
+    // Filter by lot (from serialNumbers[0]) if specified
+    if (lotFilter) {
+      const regLot = getLotFromRegistration(reg);
+      if (regLot !== lotFilter) return false;
     }
 
     return true;
@@ -565,11 +594,13 @@ export function calculateCohortSurvival(
   const dataPoints: CohortDataPoint[] = [];
   const maxMonths = claimType === "warranty" ? 12 : 1;
 
-  // Create purchase volume lookup map
+  // Create purchase volume lookup map (aggregated by yearMonth|product).
+  // When lotFilter is active, only sum volumes for that specific lot.
   const volumeMap = new Map<string, number>();
   for (const pv of purchaseVolumes) {
+    if (lotFilter && (pv.lot ?? "").toUpperCase() !== lotFilter) continue;
     const key = `${pv.yearMonth}|${pv.product}`;
-    volumeMap.set(key, pv.purchaseCount);
+    volumeMap.set(key, (volumeMap.get(key) ?? 0) + pv.purchaseCount);
   }
 
   // Generate data points for each cohort and month

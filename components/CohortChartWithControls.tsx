@@ -97,9 +97,27 @@ export function CohortChartWithControls({
   const availableMonths = useMemo(() => generateAvailableMonths(), []);
 
   const [productFilter, setProductFilter] = useState<string>("All Products");
+  const [lotFilter, setLotFilter] = useState<string>("");
   const [startMonth, setStartMonth] = useState<string>("");
   const [endMonth, setEndMonth] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Derive available lots for the selected product from purchase volumes
+  const availableLots = useMemo(() => {
+    const lots = new Set<string>();
+    for (const pv of purchaseVolumes) {
+      if (!pv.lot) continue;
+      if (productFilter === "All Products" || pv.product === productFilter) {
+        lots.add(pv.lot.toUpperCase());
+      }
+    }
+    return Array.from(lots).sort();
+  }, [purchaseVolumes, productFilter]);
+
+  // Reset lot filter when product changes
+  useEffect(() => {
+    setLotFilter("");
+  }, [productFilter]);
 
   // Set defaults based on claim type
   useEffect(() => {
@@ -116,9 +134,10 @@ export function CohortChartWithControls({
       productFilter,
       startMonth,
       endMonth,
-      claimType
+      claimType,
+      lotFilter || undefined
     );
-  }, [registrations, purchaseVolumes, productFilter, startMonth, endMonth, claimType]);
+  }, [registrations, purchaseVolumes, productFilter, startMonth, endMonth, claimType, lotFilter]);
 
   const maxMonths = claimType === "warranty" ? 12 : 1;
 
@@ -150,6 +169,23 @@ export function CohortChartWithControls({
               ))}
             </select>
           </div>
+
+          {/* Lot Filter */}
+          {availableLots.length > 0 && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-600 font-medium">Lot:</label>
+              <select
+                value={lotFilter}
+                onChange={(e) => setLotFilter(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              >
+                <option value="">All Lots</option>
+                {availableLots.map((lot) => (
+                  <option key={lot} value={lot}>{lot}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Start Month */}
           <div className="flex items-center gap-2">

@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "fetch-data": "tsx scripts/fetch-data.ts"
+    "fetch-data": "tsx scripts/fetch-data.ts",
+    "sync-shipbob": "tsx scripts/sync-shipbob.ts"
   },
   "devDependencies": {
     "tsx": "^4.7.0"
