@@ -603,8 +603,23 @@ export function calculateCohortSurvival(
     volumeMap.set(key, (volumeMap.get(key) ?? 0) + pv.purchaseCount);
   }
 
-  // Generate data points for each cohort and month
-  const cohortMonths = Object.keys(cohortClaims).sort();
+  // Generate all months in the From–To range so rows are always stable
+  const allRangeMonths: string[] = [];
+  if (startMonth && endMonth) {
+    const [sy, sm] = startMonth.split("-").map(Number);
+    const [ey, em] = endMonth.split("-").map(Number);
+    let y = sy, m = sm;
+    while (y < ey || (y === ey && m <= em)) {
+      allRangeMonths.push(`${y}-${String(m).padStart(2, "0")}`);
+      m++;
+      if (m > 12) { m = 1; y++; }
+    }
+  }
+
+  // Use range months if available, otherwise fall back to months with claims
+  const cohortMonths = allRangeMonths.length > 0
+    ? allRangeMonths
+    : Object.keys(cohortClaims).sort();
 
   // Calculate the most recent complete month
   const now = new Date();
@@ -647,7 +662,7 @@ export function calculateCohortSurvival(
         continue; // Skip this data point
       }
 
-      const claimCount = cohortClaims[cohortMonth][monthsSince] || 0;
+      const claimCount = (cohortClaims[cohortMonth] ?? {})[monthsSince] || 0;
 
       const claimRate = purchaseVolume > 0 ? (claimCount / purchaseVolume) * 100 : 0;
       const survivalRate = 100 - claimRate;

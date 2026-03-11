@@ -235,7 +235,7 @@ export function CohortChartWithControls({
       </div>
 
       {/* Heatmap */}
-      <CohortHeatmap data={cohortData} maxMonths={maxMonths} />
+      <CohortHeatmap data={cohortData} maxMonths={maxMonths} startMonth={startMonth} endMonth={endMonth} />
 
       {/* Modal */}
       <PurchaseVolumeModal

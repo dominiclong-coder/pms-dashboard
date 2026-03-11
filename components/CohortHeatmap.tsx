@@ -6,6 +6,8 @@ import { CohortDataPoint } from "@/lib/types";
 interface CohortHeatmapProps {
   data: CohortDataPoint[];
   maxMonths: number;
+  startMonth: string;
+  endMonth: string;
 }
 
 // Get color for survival rate using Excel-style conditional formatting
@@ -58,11 +60,18 @@ function getTextColor(bgColor: string): string {
   return luminance < 0.5 ? "#ffffff" : "#1e293b";
 }
 
-export function CohortHeatmap({ data, maxMonths }: CohortHeatmapProps) {
+// Format a "YYYY-MM" key into "Mon YYYY" for row labels when no data point exists
+function formatCohortLabel(yearMonth: string): string {
+  const [year, month] = yearMonth.split("-");
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${monthNames[parseInt(month) - 1]} ${year}`;
+}
+
+export function CohortHeatmap({ data, maxMonths, startMonth, endMonth }: CohortHeatmapProps) {
   const [hoveredCell, setHoveredCell] = useState<{ cohort: string; month: number } | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
-  if (data.length === 0) {
+  if (!startMonth || !endMonth) {
     return (
       <div className="p-8 text-center text-slate-500">
         No cohort data available. Please select a date range and add purchase volume data.
@@ -88,7 +97,18 @@ export function CohortHeatmap({ data, maxMonths }: CohortHeatmapProps) {
     }
   }
 
-  const cohorts = Array.from(cohortMap.keys()).sort();
+  // Always use the full From–To range for rows, regardless of which months have data
+  const cohorts: string[] = [];
+  {
+    const [sy, sm] = startMonth.split("-").map(Number);
+    const [ey, em] = endMonth.split("-").map(Number);
+    let y = sy, m = sm;
+    while (y < ey || (y === ey && m <= em)) {
+      cohorts.push(`${y}-${String(m).padStart(2, "0")}`);
+      m++;
+      if (m > 12) { m = 1; y++; }
+    }
+  }
   const months = Array.from({ length: maxMonths + 1 }, (_, i) => i);
 
   const handleMouseEnter = (cohort: string, month: number, e: React.MouseEvent) => {
@@ -137,25 +157,23 @@ export function CohortHeatmap({ data, maxMonths }: CohortHeatmapProps) {
           </thead>
           <tbody>
             {cohorts.map((cohort) => {
-              const cohortData = cohortMap.get(cohort)!;
-              const firstPoint = cohortData.get(0);
+              const cohortData = cohortMap.get(cohort);
+              const firstPoint = cohortData?.get(0);
 
               return (
                 <tr key={cohort} className="hover:bg-slate-50">
                   <td className="sticky left-0 bg-white z-10 px-2 py-1.5 border-b border-slate-200 font-medium text-slate-700 text-xs">
-                    {firstPoint?.cohortLabel || cohort}
+                    {firstPoint?.cohortLabel || formatCohortLabel(cohort)}
                   </td>
                   {months.map((month) => {
-                    const point = cohortData.get(month);
+                    const point = cohortData?.get(month);
 
                     if (!point) {
                       return (
                         <td
                           key={month}
-                          className="px-2 py-1.5 border-b border-slate-200 text-center text-slate-400 text-xs"
-                        >
-                          -
-                        </td>
+                          className="px-2 py-1.5 border-b border-slate-200"
+                        />
                       );
                     }
 
