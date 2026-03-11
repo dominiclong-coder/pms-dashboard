@@ -382,194 +382,15 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Cohort Survival Analysis Chart */}
         {hasData && (
-          <Filters
-            filterValues={filterValues}
-            filters={filters}
-            onFiltersChange={setFilters}
+          <CohortChartWithControls
+            registrations={registrations}
+            purchaseVolumes={purchaseVolumes}
+            claimType={claimType}
+            onPurchaseVolumesUpdate={handlePurchaseVolumesUpdate}
           />
         )}
-
-        {/* Period & Date Range Controls */}
-        {hasData && (
-          <div className="flex flex-wrap items-center gap-4 mb-6">
-            {/* Period Toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600">View by:</span>
-              <div className="flex bg-white border border-slate-200 rounded-lg p-1">
-                <button
-                  onClick={() => setPeriod("weekly")}
-                  className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-                    period === "weekly"
-                      ? "bg-blue-600 text-white"
-                      : "text-slate-600 hover:bg-slate-100"
-                  }`}
-                >
-                  Weekly
-                </button>
-                <button
-                  onClick={() => setPeriod("monthly")}
-                  className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-                    period === "monthly"
-                      ? "bg-blue-600 text-white"
-                      : "text-slate-600 hover:bg-slate-100"
-                  }`}
-                >
-                  Monthly
-                </button>
-              </div>
-            </div>
-
-            {/* Date Range Selector */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600">Range:</span>
-              <div className="flex bg-white border border-slate-200 rounded-lg p-1">
-                {([
-                  { value: "30d", label: "30d" },
-                  { value: "90d", label: "90d" },
-                  { value: "180d", label: "6m" },
-                  { value: "1y", label: "1y" },
-                  { value: "all", label: "All" },
-                ] as { value: DateRange; label: string }[]).map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => setDateRange(option.value)}
-                    className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                      dateRange === option.value
-                        ? "bg-blue-600 text-white"
-                        : "text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Control Limits Configuration */}
-        {hasData && (
-          <div className="mb-6 bg-white rounded-xl border border-slate-200 p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-slate-900">Statistical Control Limits</h3>
-              <button
-                onClick={() => setShowControlLimits(!showControlLimits)}
-                className="text-slate-500 hover:text-slate-700 text-lg font-light transition-colors"
-                title={showControlLimits ? "Hide control limits" : "Show control limits"}
-              >
-                {showControlLimits ? "−" : "+"}
-              </button>
-            </div>
-            {showControlLimits && (
-              <>
-                <div className="grid grid-cols-2 gap-6">
-                  {/* Action Level Multiplier */}
-                  <div className="flex flex-col gap-3">
-                    <label className="text-sm text-slate-600">
-                      Action Level (Mean + {actionLevelMultiplier.toFixed(2)}σ)
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min="0.5"
-                        max="3"
-                        step="0.05"
-                        value={actionLevelMultiplier}
-                        onChange={(e) => setActionLevelMultiplier(parseFloat(e.target.value))}
-                        className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <span className="text-sm font-medium text-slate-900 w-12 text-right">
-                        {actionLevelMultiplier.toFixed(2)}σ
-                      </span>
-                    </div>
-                    <span className="text-xs text-slate-500">
-                      Level: {controlLimits.actionLevel.toFixed(3)}%
-                    </span>
-                  </div>
-
-                  {/* Alert Level Multiplier */}
-                  <div className="flex flex-col gap-3">
-                    <label className="text-sm text-slate-600">
-                      Alert Level (Mean + {alertLevelMultiplier.toFixed(2)}σ)
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min="0.5"
-                        max="3"
-                        step="0.05"
-                        value={alertLevelMultiplier}
-                        onChange={(e) => setAlertLevelMultiplier(parseFloat(e.target.value))}
-                        className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <span className="text-sm font-medium text-slate-900 w-12 text-right">
-                        {alertLevelMultiplier.toFixed(2)}σ
-                      </span>
-                    </div>
-                    <span className="text-xs text-slate-500">
-                      Level: {controlLimits.alertLevel.toFixed(3)}%
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Statistics Display */}
-                {/* Line Visibility Toggles */}
-                <div className="mt-4 pt-4 border-t border-slate-200">
-                  <span className="text-xs text-slate-500 block mb-3">Show Reference Lines:</span>
-                  <div className="flex flex-col gap-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={showMeanLine}
-                        onChange={(e) => setShowMeanLine(e.target.checked)}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm text-slate-600">Mean</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={showActionLine}
-                        onChange={(e) => setShowActionLine(e.target.checked)}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm text-slate-600">Action Level</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={showAlertLine}
-                        onChange={(e) => setShowAlertLine(e.target.checked)}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm text-slate-600">Alert Level</span>
-                    </label>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Claims % Chart */}
-        {hasData && (() => {
-          const visibleControlLimits = controlLimits && {
-            ...controlLimits,
-            showMean: showMeanLine,
-            showAction: showActionLine,
-            showAlert: showAlertLine,
-          };
-          return (
-            <ClaimsChart
-              title={`${claimTypeLabel} % of Exposure Days`}
-              data={chartData}
-              color={chartColor}
-              controlLimits={visibleControlLimits}
-            />
-          );
-        })()}
 
         {/* Claims Over Time Chart */}
         {hasData && (
@@ -586,15 +407,183 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Cohort Survival Analysis Chart */}
+        {/* Claims % Chart */}
         {hasData && (
           <div className="mt-6">
-            <CohortChartWithControls
-              registrations={registrations}
-              purchaseVolumes={purchaseVolumes}
-              claimType={claimType}
-              onPurchaseVolumesUpdate={handlePurchaseVolumesUpdate}
+            <Filters
+              filterValues={filterValues}
+              filters={filters}
+              onFiltersChange={setFilters}
             />
+
+            {/* Period & Date Range Controls */}
+            <div className="flex flex-wrap items-center gap-4 mb-6">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-600">View by:</span>
+                <div className="flex bg-white border border-slate-200 rounded-lg p-1">
+                  <button
+                    onClick={() => setPeriod("weekly")}
+                    className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+                      period === "weekly"
+                        ? "bg-blue-600 text-white"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    onClick={() => setPeriod("monthly")}
+                    className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+                      period === "monthly"
+                        ? "bg-blue-600 text-white"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-600">Range:</span>
+                <div className="flex bg-white border border-slate-200 rounded-lg p-1">
+                  {([
+                    { value: "30d", label: "30d" },
+                    { value: "90d", label: "90d" },
+                    { value: "180d", label: "6m" },
+                    { value: "1y", label: "1y" },
+                    { value: "all", label: "All" },
+                  ] as { value: DateRange; label: string }[]).map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setDateRange(option.value)}
+                      className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                        dateRange === option.value
+                          ? "bg-blue-600 text-white"
+                          : "text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Control Limits Configuration */}
+            <div className="mb-6 bg-white rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-slate-900">Statistical Control Limits</h3>
+                <button
+                  onClick={() => setShowControlLimits(!showControlLimits)}
+                  className="text-slate-500 hover:text-slate-700 text-lg font-light transition-colors"
+                  title={showControlLimits ? "Hide control limits" : "Show control limits"}
+                >
+                  {showControlLimits ? "−" : "+"}
+                </button>
+              </div>
+              {showControlLimits && (
+                <>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="flex flex-col gap-3">
+                      <label className="text-sm text-slate-600">
+                        Action Level (Mean + {actionLevelMultiplier.toFixed(2)}σ)
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min="0.5"
+                          max="3"
+                          step="0.05"
+                          value={actionLevelMultiplier}
+                          onChange={(e) => setActionLevelMultiplier(parseFloat(e.target.value))}
+                          className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <span className="text-sm font-medium text-slate-900 w-12 text-right">
+                          {actionLevelMultiplier.toFixed(2)}σ
+                        </span>
+                      </div>
+                      <span className="text-xs text-slate-500">
+                        Level: {controlLimits.actionLevel.toFixed(3)}%
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <label className="text-sm text-slate-600">
+                        Alert Level (Mean + {alertLevelMultiplier.toFixed(2)}σ)
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min="0.5"
+                          max="3"
+                          step="0.05"
+                          value={alertLevelMultiplier}
+                          onChange={(e) => setAlertLevelMultiplier(parseFloat(e.target.value))}
+                          className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <span className="text-sm font-medium text-slate-900 w-12 text-right">
+                          {alertLevelMultiplier.toFixed(2)}σ
+                        </span>
+                      </div>
+                      <span className="text-xs text-slate-500">
+                        Level: {controlLimits.alertLevel.toFixed(3)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-slate-200">
+                    <span className="text-xs text-slate-500 block mb-3">Show Reference Lines:</span>
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showMeanLine}
+                          onChange={(e) => setShowMeanLine(e.target.checked)}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm text-slate-600">Mean</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showActionLine}
+                          onChange={(e) => setShowActionLine(e.target.checked)}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm text-slate-600">Action Level</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showAlertLine}
+                          onChange={(e) => setShowAlertLine(e.target.checked)}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm text-slate-600">Alert Level</span>
+                      </label>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {(() => {
+              const visibleControlLimits = controlLimits && {
+                ...controlLimits,
+                showMean: showMeanLine,
+                showAction: showActionLine,
+                showAlert: showAlertLine,
+              };
+              return (
+                <ClaimsChart
+                  title={`${claimTypeLabel} % of Exposure Days`}
+                  data={chartData}
+                  color={chartColor}
+                  controlLimits={visibleControlLimits}
+                />
+              );
+            })()}
           </div>
         )}
       </div>
