@@ -5,6 +5,7 @@ import { Registration, PurchaseVolume, PurchaseVolumeData } from "@/lib/types";
 import { calculateCohortSurvival } from "@/lib/analytics";
 import { CohortHeatmap } from "./CohortHeatmap";
 import { PurchaseVolumeModal } from "./PurchaseVolumeModal";
+import { LotCoverageModal } from "./LotCoverageModal";
 
 interface CohortChartWithControlsProps {
   registrations: Registration[];
@@ -101,6 +102,7 @@ export function CohortChartWithControls({
   const [startMonth, setStartMonth] = useState<string>("");
   const [endMonth, setEndMonth] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCoverageOpen, setIsCoverageOpen] = useState(false);
 
   // Derive available lots for the selected product from purchase volumes
   const availableLots = useMemo(() => {
@@ -219,13 +221,21 @@ export function CohortChartWithControls({
             </select>
           </div>
 
-          {/* Update Purchase Data Button */}
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-          >
-            Update Purchase Data
-          </button>
+          {/* Lot Coverage & Update Purchase Data Buttons */}
+          <div className="ml-auto flex gap-2">
+            <button
+              onClick={() => setIsCoverageOpen(true)}
+              className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium"
+            >
+              Lot Coverage
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            >
+              Update Purchase Data
+            </button>
+          </div>
         </div>
 
         <p className="text-xs text-slate-500 mt-3">
@@ -236,6 +246,14 @@ export function CohortChartWithControls({
 
       {/* Heatmap */}
       <CohortHeatmap data={cohortData} maxMonths={maxMonths} startMonth={startMonth} endMonth={endMonth} />
+
+      {/* Lot Coverage Modal */}
+      <LotCoverageModal
+        isOpen={isCoverageOpen}
+        onClose={() => setIsCoverageOpen(false)}
+        registrations={registrations}
+        purchaseVolumes={purchaseVolumes}
+      />
 
       {/* Modal */}
       <PurchaseVolumeModal
