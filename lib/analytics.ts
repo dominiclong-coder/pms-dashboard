@@ -31,10 +31,19 @@ export interface Filters {
   lots?: string[];
 }
 
-/** Extract the lot number a customer entered (first serial number, uppercased). */
+/** Extract and normalise the lot number a customer entered (first serial number). */
 function getLotFromRegistration(reg: Registration): string | null {
-  const sn = reg.serialNumbers?.[0]?.trim();
-  return sn ? sn.toUpperCase() : null;
+  const raw = reg.serialNumbers?.[0]?.trim();
+  if (!raw) return null;
+  const sn = raw.toUpperCase();
+
+  // Pre-lot-tracking era — ignore entirely
+  if (/^202[234]/.test(sn)) return null;
+
+  // Explicit aliases for known entry variants
+  if (sn === "202504") return "202504-DPP";
+
+  return sn;
 }
 
 // Calculate days between two dates
