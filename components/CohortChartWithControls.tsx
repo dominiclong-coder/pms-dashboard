@@ -5,7 +5,6 @@ import { Registration, PurchaseVolume, PurchaseVolumeData } from "@/lib/types";
 import { calculateCohortSurvival } from "@/lib/analytics";
 import { CohortHeatmap } from "./CohortHeatmap";
 import { PurchaseVolumeModal } from "./PurchaseVolumeModal";
-import { LotCoverageModal } from "./LotCoverageModal";
 
 interface CohortChartWithControlsProps {
   registrations: Registration[];
@@ -102,7 +101,6 @@ export function CohortChartWithControls({
   const [startMonth, setStartMonth] = useState<string>("");
   const [endMonth, setEndMonth] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isCoverageOpen, setIsCoverageOpen] = useState(false);
 
   // Derive available lots for the selected product from purchase volumes
   const availableLots = useMemo(() => {
@@ -250,14 +248,8 @@ export function CohortChartWithControls({
             </select>
           </div>
 
-          {/* Lot Coverage & Update Purchase Data Buttons */}
-          <div className="ml-auto flex gap-2">
-            <button
-              onClick={() => setIsCoverageOpen(true)}
-              className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium"
-            >
-              Lot Coverage
-            </button>
+          {/* Update Purchase Data Button */}
+          <div className="ml-auto">
             <button
               onClick={() => setIsModalOpen(true)}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
@@ -281,14 +273,6 @@ export function CohortChartWithControls({
         endMonth={endMonth}
         globalMinRate={globalColorScale.min}
         globalMaxRate={globalColorScale.max}
-      />
-
-      {/* Lot Coverage Modal */}
-      <LotCoverageModal
-        isOpen={isCoverageOpen}
-        onClose={() => setIsCoverageOpen(false)}
-        registrations={registrations}
-        purchaseVolumes={purchaseVolumes}
       />
 
       {/* Modal */}
