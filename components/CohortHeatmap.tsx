@@ -8,6 +8,8 @@ interface CohortHeatmapProps {
   maxMonths: number;
   startMonth: string;
   endMonth: string;
+  globalMinRate: number;
+  globalMaxRate: number;
 }
 
 // Get color for survival rate using Excel-style conditional formatting
@@ -67,7 +69,7 @@ function formatCohortLabel(yearMonth: string): string {
   return `${monthNames[parseInt(month) - 1]} ${year}`;
 }
 
-export function CohortHeatmap({ data, maxMonths, startMonth, endMonth }: CohortHeatmapProps) {
+export function CohortHeatmap({ data, maxMonths, startMonth, endMonth, globalMinRate, globalMaxRate }: CohortHeatmapProps) {
   const [hoveredCell, setHoveredCell] = useState<{ cohort: string; month: number } | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
@@ -81,20 +83,12 @@ export function CohortHeatmap({ data, maxMonths, startMonth, endMonth }: CohortH
 
   // Group data by cohort
   const cohortMap = new Map<string, Map<number, CohortDataPoint>>();
-  let minSurvivalRate = 100;
-  let maxSurvivalRate = 0;
 
   for (const point of data) {
     if (!cohortMap.has(point.cohortMonth)) {
       cohortMap.set(point.cohortMonth, new Map());
     }
     cohortMap.get(point.cohortMonth)!.set(point.monthsSincePurchase, point);
-
-    // Track min/max survival rates (only for cells with purchase data)
-    if (point.purchaseVolume > 0) {
-      minSurvivalRate = Math.min(minSurvivalRate, point.survivalRate);
-      maxSurvivalRate = Math.max(maxSurvivalRate, point.survivalRate);
-    }
   }
 
   // Always use the full From–To range for rows, regardless of which months have data
@@ -178,7 +172,7 @@ export function CohortHeatmap({ data, maxMonths, startMonth, endMonth }: CohortH
                     }
 
                     const hasPurchaseData = point.purchaseVolume > 0;
-                    const bgColor = getSurvivalRateColor(point.survivalRate, hasPurchaseData, minSurvivalRate, maxSurvivalRate);
+                    const bgColor = getSurvivalRateColor(point.survivalRate, hasPurchaseData, globalMinRate, globalMaxRate);
                     const textColor = getTextColor(bgColor);
 
                     return (
@@ -231,24 +225,20 @@ export function CohortHeatmap({ data, maxMonths, startMonth, endMonth }: CohortH
       )}
 
       {/* Legend */}
-      <div className="mt-4 flex items-center gap-4 text-sm">
-        <span className="font-medium text-slate-700">Survival Rate:</span>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded" style={{ backgroundColor: "#f0fdf4" }} />
-          <span className="text-slate-600">High (98%+)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded" style={{ backgroundColor: "#fef9c3" }} />
-          <span className="text-slate-600">Good (90-98%)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded" style={{ backgroundColor: "#fed7aa" }} />
-          <span className="text-slate-600">Fair (70-90%)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded" style={{ backgroundColor: "#dc2626" }} />
-          <span className="text-slate-600 text-white px-1">Poor (&lt;50%)</span>
-        </div>
+      <div className="mt-4 flex items-center gap-3 text-xs text-slate-600">
+        <span className="font-medium text-slate-700 text-sm">Survival Rate:</span>
+        <div
+          className="h-4 rounded flex-1 max-w-xs"
+          style={{
+            background: `linear-gradient(to right, #f92500, #facc15, #45b446)`,
+          }}
+        />
+        <span>{globalMinRate.toFixed(1)}%</span>
+        <span className="text-slate-400">→</span>
+        <span>{globalMaxRate.toFixed(1)}%</span>
+        <span className="text-slate-400 ml-2">|</span>
+        <div className="w-4 h-4 rounded" style={{ backgroundColor: "#f1f5f9", border: "1px solid #e2e8f0" }} />
+        <span>No purchase data</span>
       </div>
     </div>
   );

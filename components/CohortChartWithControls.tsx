@@ -128,7 +128,7 @@ export function CohortChartWithControls({
     setEndMonth(defaults.endMonth);
   }, [availableMonths, claimType]);
 
-  // Calculate cohort data
+  // Calculate cohort data for the current filters
   const cohortData = useMemo(() => {
     return calculateCohortSurvival(
       registrations,
@@ -140,6 +140,33 @@ export function CohortChartWithControls({
       lotFilter || undefined
     );
   }, [registrations, purchaseVolumes, productFilter, startMonth, endMonth, claimType, lotFilter]);
+
+  // Compute global colour scale across ALL products, ALL lots, full date range.
+  // This ensures a consistent colour mapping regardless of current filters.
+  const globalColorScale = useMemo(() => {
+    const fullStart = availableMonths[0] ?? startMonth;
+    const fullEnd = availableMonths[availableMonths.length - 1] ?? endMonth;
+    const allData = calculateCohortSurvival(
+      registrations,
+      purchaseVolumes,
+      "All Products",
+      fullStart,
+      fullEnd,
+      claimType,
+      undefined
+    );
+    let min = 100;
+    let max = 0;
+    for (const point of allData) {
+      if (point.purchaseVolume > 0) {
+        min = Math.min(min, point.survivalRate);
+        max = Math.max(max, point.survivalRate);
+      }
+    }
+    // Fallback if no data
+    if (min > max) { min = 90; max = 100; }
+    return { min, max };
+  }, [registrations, purchaseVolumes, availableMonths, claimType]);
 
   const maxMonths = claimType === "warranty" ? 12 : 1;
 
@@ -245,7 +272,14 @@ export function CohortChartWithControls({
       </div>
 
       {/* Heatmap */}
-      <CohortHeatmap data={cohortData} maxMonths={maxMonths} startMonth={startMonth} endMonth={endMonth} />
+      <CohortHeatmap
+        data={cohortData}
+        maxMonths={maxMonths}
+        startMonth={startMonth}
+        endMonth={endMonth}
+        globalMinRate={globalColorScale.min}
+        globalMaxRate={globalColorScale.max}
+      />
 
       {/* Lot Coverage Modal */}
       <LotCoverageModal
