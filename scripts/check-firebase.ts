@@ -8,6 +8,88 @@ async function main() {
     loadPurchaseVolumes(),
   ]);
 
+  // ─── Form change verification: 5 March 2026 ───────────────────────────────
+  const CUTOFF = "2026-03-05";
+  const before = warrantyRegistrations.filter(r => r.createdAt && r.createdAt < CUTOFF);
+  const after  = warrantyRegistrations.filter(r => r.createdAt && r.createdAt >= CUTOFF);
+
+  const countHasProductName = (regs: typeof warrantyRegistrations) =>
+    regs.filter(r => r.productName && r.productName.trim() !== "").length;
+  const countHasFieldProductName = (regs: typeof warrantyRegistrations) =>
+    regs.filter(r => {
+      const v = r.fieldData?.["product-Name"] as string | undefined;
+      return v && v.trim() !== "";
+    }).length;
+  const countHasBoth = (regs: typeof warrantyRegistrations) =>
+    regs.filter(r => {
+      const fn = r.productName && r.productName.trim() !== "";
+      const fd = (r.fieldData?.["product-Name"] as string | undefined)?.trim() !== "" && r.fieldData?.["product-Name"];
+      return fn && fd;
+    }).length;
+  const countHasNeither = (regs: typeof warrantyRegistrations) =>
+    regs.filter(r => {
+      const fn = r.productName && r.productName.trim() !== "";
+      const fd = (r.fieldData?.["product-Name"] as string | undefined)?.trim() !== "" && r.fieldData?.["product-Name"];
+      return !fn && !fd;
+    }).length;
+
+  console.log("=== Form Change Verification: productName vs fieldData['product-Name'] ===");
+  console.log(`Cutoff date: ${CUTOFF}`);
+  console.log(`\nBEFORE ${CUTOFF} (${before.length} claims):`);
+  console.log(`  productName populated:              ${countHasProductName(before)} / ${before.length}`);
+  console.log(`  fieldData["product-Name"] populated: ${countHasFieldProductName(before)} / ${before.length}`);
+  console.log(`  Both populated:                      ${countHasBoth(before)}`);
+  console.log(`  Neither populated:                   ${countHasNeither(before)}`);
+
+  console.log(`\nON/AFTER ${CUTOFF} (${after.length} claims):`);
+  console.log(`  productName populated:              ${countHasProductName(after)} / ${after.length}`);
+  console.log(`  fieldData["product-Name"] populated: ${countHasFieldProductName(after)} / ${after.length}`);
+  console.log(`  Both populated:                      ${countHasBoth(after)}`);
+  console.log(`  Neither populated:                   ${countHasNeither(after)}`);
+
+  // Show sample records from after the cutoff
+  if (after.length > 0) {
+    console.log(`\nSample records ON/AFTER ${CUTOFF} (up to 5):`);
+    after.slice(0, 5).forEach((r, i) => {
+      const fdProd = r.fieldData?.["product-Name"] as string | undefined;
+      console.log(`  [${i+1}] createdAt: ${r.createdAt}`);
+      console.log(`        productName:              "${r.productName ?? ""}"`);
+      console.log(`        fieldData["product-Name"]: "${fdProd ?? ""}"`);
+    });
+  }
+
+  // Show all fieldData keys present in after-cutoff records
+  const allFdKeys: Record<string, number> = {};
+  for (const r of after) {
+    for (const key of Object.keys(r.fieldData ?? {})) {
+      allFdKeys[key] = (allFdKeys[key] || 0) + 1;
+    }
+  }
+  console.log(`\nAll fieldData keys present ON/AFTER ${CUTOFF} (across ${after.length} records):`);
+  for (const [key, count] of Object.entries(allFdKeys).sort((a, b) => b[1] - a[1])) {
+    console.log(`  "${key}": ${count} records`);
+  }
+
+  // Show all fieldData keys present BEFORE cutoff for comparison
+  const beforeFdKeys: Record<string, number> = {};
+  for (const r of before.slice(0, 500)) { // Sample 500 for speed
+    for (const key of Object.keys(r.fieldData ?? {})) {
+      beforeFdKeys[key] = (beforeFdKeys[key] || 0) + 1;
+    }
+  }
+  console.log(`\nFieldData keys in BEFORE ${CUTOFF} sample (first 500 records):`);
+  for (const [key, count] of Object.entries(beforeFdKeys).sort((a, b) => b[1] - a[1])) {
+    console.log(`  "${key}": ${count} records`);
+  }
+
+  // Show full fieldData for first 3 after-cutoff records
+  console.log(`\nFull fieldData for first 3 records ON/AFTER ${CUTOFF}:`);
+  after.slice(0, 3).forEach((r, i) => {
+    console.log(`  [${i+1}] createdAt: ${r.createdAt}`);
+    console.log(`        fieldData:`, JSON.stringify(r.fieldData, null, 6));
+  });
+  // ──────────────────────────────────────────────────────────────────────────
+
   const total = warrantyRegistrations.length;
   const hasShopify = warrantyRegistrations.filter(r => r.shopifyOrderCreatedAt).length;
   const hasPurchaseDate = warrantyRegistrations.filter(r => r.purchaseDate).length;

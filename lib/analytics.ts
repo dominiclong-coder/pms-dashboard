@@ -120,7 +120,8 @@ export function extractFilterValues(registrations: Registration[]): FilterValues
   const lots = new Set<string>();
 
   for (const reg of registrations) {
-    if (reg.productName) productNames.add(reg.productName);
+    const pn = getProductName(reg);
+    if (pn) productNames.add(pn);
     if (reg.productSku) skus.add(reg.productSku);
     if (reg.serialNumbers) {
       for (const sn of reg.serialNumbers) {
@@ -156,7 +157,8 @@ export function applyFilters(registrations: Registration[], filters: Filters): R
   return registrations.filter((reg) => {
     // Product Name filter
     if (filters.productNames && filters.productNames.length > 0) {
-      if (!reg.productName || !filters.productNames.includes(reg.productName)) {
+      const pn = getProductName(reg);
+      if (!pn || !filters.productNames.includes(pn)) {
         return false;
       }
     }
@@ -342,7 +344,7 @@ function getExtendedPeriodLabel(periodKey: string, period: TimePeriod): string {
 function getGroupValue(reg: Registration, groupBy: GroupBy): string {
   switch (groupBy) {
     case "productName":
-      return reg.productName || "Unknown Product";
+      return getProductName(reg) || "Unknown Product";
     case "sku":
       return reg.productSku || "Unknown SKU";
     case "reason":
@@ -475,6 +477,18 @@ export function combineFilterValues(filterValuesArray: FilterValues[]): FilterVa
   return combined;
 }
 
+/**
+ * Returns the product name for a registration, falling back to
+ * fieldData["product-name"] for forms submitted from 5 March 2026 onwards
+ * (where the top-level productName field is no longer populated).
+ */
+export function getProductName(reg: Registration): string | undefined {
+  const topLevel = reg.productName?.trim();
+  if (topLevel) return topLevel;
+  const fromField = (reg.fieldData?.["product-name"] as string | undefined)?.trim();
+  return fromField || undefined;
+}
+
 // Extract product type from full product name for cohort analysis
 export function extractProductType(productName: string | undefined): string {
   if (!productName) return "Other";
@@ -548,7 +562,7 @@ export function calculateCohortSurvival(
     }
 
     // Filter by product
-    const productType = extractProductType(reg.productName);
+    const productType = extractProductType(getProductName(reg));
 
     if (productFilter === "All Products") {
       // Only include claims from products we're tracking
