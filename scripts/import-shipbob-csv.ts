@@ -32,7 +32,8 @@ const DEFAULT_CSV_PATH = path.join(
 const EXCLUDED_CHANNEL = "zima-pro-usa";
 const ALLOWED_STATUSES = new Set(["Completed", "Shipped"]);
 
-const ZIMA = "Zima Go/Zima UV Case/Zima Case Air";
+const ZIMA           = "Zima Go/Zima UV Case";
+const ZIMA_CASE_AIR  = "Zima Case Air";
 
 /**
  * Map a ShipBob line item name to one or more product strings.
@@ -54,6 +55,7 @@ function getProductsFromName(name: string): string[] {
   if (/dental pod go/i.test(n))  return ["Dental Pod Go"];
   if (/dental pod pro/i.test(n)) return ["Dental Pod Pro"];
   if (/dental pod/i.test(n))     return ["Dental Pod"];
+  if (/zima case air/i.test(n))        return [ZIMA_CASE_AIR];
   if (/zima uv case|zima go/i.test(n)) return [ZIMA];
 
   return [];

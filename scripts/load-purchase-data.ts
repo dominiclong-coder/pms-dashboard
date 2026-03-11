@@ -97,7 +97,7 @@ const dentalPodProData = {
   "2026-01": 7875,
 };
 
-// Purchase data for Zima Go/Zima UV Case/Zima Case Air
+// Purchase data for Zima Go/Zima UV Case
 const zimaData = {
   "2023-03": 17,
   "2023-04": 16,
@@ -166,11 +166,11 @@ async function loadPurchaseVolumes() {
   }
 
   // Load Zima purchase data
-  console.log("\nZima Go/Zima UV Case/Zima Case Air:");
+  console.log("\nZima Go/Zima UV Case:");
   for (const [yearMonth, count] of Object.entries(zimaData)) {
     volumes.push({
       yearMonth,
-      product: "Zima Go/Zima UV Case/Zima Case Air",
+      product: "Zima Go/Zima UV Case",
       purchaseCount: count,
     });
     console.log(`  ${yearMonth}: ${count.toLocaleString()} units`);
@@ -184,7 +184,7 @@ async function loadPurchaseVolumes() {
   });
 
   console.log(`\n✓ Successfully loaded ${volumes.length} data points to Firebase`);
-  console.log("\nProducts loaded: Dental Pod, Dental Pod Pro, Zima Go/Zima UV Case/Zima Case Air");
+  console.log("\nProducts loaded: Dental Pod, Dental Pod Pro, Zima Go/Zima UV Case");
   console.log("You can add Dental Pod Go data through the dashboard UI.");
 }
 

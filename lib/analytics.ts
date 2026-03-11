@@ -509,9 +509,14 @@ export function extractProductType(productName: string | undefined): string {
     return "Dental Pod";
   }
 
-  // Match all Zima variants
-  if (/Zima (Go|UV Case|Case Air)/i.test(productName)) {
-    return "Zima Go/Zima UV Case/Zima Case Air";
+  // Match Zima Case Air separately (must come before the Zima Go/UV Case check)
+  if (/Zima Case Air/i.test(productName)) {
+    return "Zima Case Air";
+  }
+
+  // Match Zima Go and Zima UV Case
+  if (/Zima (Go|UV Case)/i.test(productName)) {
+    return "Zima Go/Zima UV Case";
   }
 
   return "Other";
@@ -570,7 +575,7 @@ export function calculateCohortSurvival(
         "Dental Pod",
         "Dental Pod Go",
         "Dental Pod Pro",
-        "Zima Go/Zima UV Case/Zima Case Air",
+        "Zima Go/Zima UV Case",
       ];
       if (!trackedProducts.includes(productType)) return false;
     } else {
@@ -619,10 +624,15 @@ export function calculateCohortSurvival(
 
   // Create purchase volume lookup map (aggregated by yearMonth|product).
   // When lotFilter is active, only sum volumes for that specific lot.
+  // Normalise legacy Firebase key "Zima Go/Zima UV Case/Zima Case Air" → "Zima Go/Zima UV Case"
+  // so existing data continues to work without a re-import.
   const volumeMap = new Map<string, number>();
   for (const pv of purchaseVolumes) {
     if (lotFilter && (pv.lot ?? "").toUpperCase() !== lotFilter) continue;
-    const key = `${pv.yearMonth}|${pv.product}`;
+    const product = pv.product === "Zima Go/Zima UV Case/Zima Case Air"
+      ? "Zima Go/Zima UV Case"
+      : pv.product;
+    const key = `${pv.yearMonth}|${product}`;
     volumeMap.set(key, (volumeMap.get(key) ?? 0) + pv.purchaseCount);
   }
 
@@ -659,7 +669,7 @@ export function calculateCohortSurvival(
         "Dental Pod",
         "Dental Pod Go",
         "Dental Pod Pro",
-        "Zima Go/Zima UV Case/Zima Case Air",
+        "Zima Go/Zima UV Case",
       ];
 
       for (const product of allProducts) {

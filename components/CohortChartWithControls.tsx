@@ -19,7 +19,7 @@ const PRODUCTS = [
   "Dental Pod Go",
   "Dental Pod",
   "Dental Pod Pro",
-  "Zima Go/Zima UV Case/Zima Case Air",
+  "Zima Go/Zima UV Case",
 ];
 
 // Generate list of available months (only complete months)
