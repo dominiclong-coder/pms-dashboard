@@ -141,17 +141,16 @@ export function CohortChartWithControls({
     );
   }, [registrations, purchaseVolumes, productFilter, startMonth, endMonth, claimType, lotFilter]);
 
-  // Compute global colour scale across ALL products, ALL lots, full date range.
-  // This ensures a consistent colour mapping regardless of current filters.
+  // Compute global colour scale across ALL products and ALL lots for the selected date range.
+  // Product/lot filters don't affect the scale — only the date window does.
   const globalColorScale = useMemo(() => {
-    const fullStart = availableMonths[0] ?? startMonth;
-    const fullEnd = availableMonths[availableMonths.length - 1] ?? endMonth;
+    if (!startMonth || !endMonth) return { min: 90, max: 100 };
     const allData = calculateCohortSurvival(
       registrations,
       purchaseVolumes,
       "All Products",
-      fullStart,
-      fullEnd,
+      startMonth,
+      endMonth,
       claimType,
       undefined
     );
@@ -159,14 +158,17 @@ export function CohortChartWithControls({
     let max = 0;
     for (const point of allData) {
       if (point.purchaseVolume > 0) {
-        min = Math.min(min, point.survivalRate);
-        max = Math.max(max, point.survivalRate);
+        // Clamp to 0–100 so outlier cohorts with more claims than purchase volume
+        // don't collapse the colour scale for everything else
+        const clamped = Math.max(0, Math.min(100, point.survivalRate));
+        min = Math.min(min, clamped);
+        max = Math.max(max, clamped);
       }
     }
     // Fallback if no data
     if (min > max) { min = 90; max = 100; }
     return { min, max };
-  }, [registrations, purchaseVolumes, availableMonths, claimType]);
+  }, [registrations, purchaseVolumes, startMonth, endMonth, claimType]);
 
   const maxMonths = claimType === "warranty" ? 12 : 1;
 

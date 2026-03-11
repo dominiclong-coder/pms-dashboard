@@ -17,7 +17,7 @@ interface CohortHeatmapProps {
 function getSurvivalRateColor(rate: number, hasPurchaseData: boolean, minRate: number, maxRate: number): string {
   if (!hasPurchaseData) return "#f1f5f9"; // Gray for N/A
 
-  // Clamp rate between 0 and 100
+  // Clamp rate to valid survival range (negative values mean more claims than purchase volume)
   const clampedRate = Math.max(0, Math.min(100, rate));
 
   // Normalize rate to 0-1 range based on min/max of actual data

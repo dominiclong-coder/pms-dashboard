@@ -1,8 +1,12 @@
 import { loadFromFirebase } from "../lib/firebase";
-import { calculateExposureDays, isValidExposure } from "../lib/analytics";
+import { calculateExposureDays, isValidExposure, calculateCohortSurvival } from "../lib/analytics";
+import { loadPurchaseVolumes } from "../lib/firebase";
 
 async function main() {
-  const { warrantyRegistrations } = await loadFromFirebase();
+  const [{ warrantyRegistrations }, { volumes: purchaseVolumes }] = await Promise.all([
+    loadFromFirebase(),
+    loadPurchaseVolumes(),
+  ]);
 
   const total = warrantyRegistrations.length;
   const hasShopify = warrantyRegistrations.filter(r => r.shopifyOrderCreatedAt).length;
@@ -52,6 +56,39 @@ async function main() {
   console.log("\nProduct name variants:");
   for (const [n, count] of Object.entries(names).sort((a, b) => b[1] - a[1])) {
     console.log(`  "${n}": ${count}`);
+  }
+
+  // --- Global colour scale check ---
+  console.log("\n=== Global Colour Scale ===");
+  const { filterByValidExposure } = await import("../lib/analytics");
+  const validRegs = filterByValidExposure(warrantyRegistrations, "warranty");
+  const allData = calculateCohortSurvival(validRegs, purchaseVolumes, "All Products", "2023-01", "2026-02", "warranty", undefined);
+
+  let rawMin = Infinity, rawMax = -Infinity;
+  let clampedMin = 100, clampedMax = 0;
+  const negativeRows: { cohort: string; months: number; rate: number; claims: number; volume: number }[] = [];
+
+  for (const p of allData) {
+    if (p.purchaseVolume > 0) {
+      rawMin = Math.min(rawMin, p.survivalRate);
+      rawMax = Math.max(rawMax, p.survivalRate);
+      const clamped = Math.max(0, Math.min(100, p.survivalRate));
+      clampedMin = Math.min(clampedMin, clamped);
+      clampedMax = Math.max(clampedMax, clamped);
+      if (p.survivalRate < 0) {
+        negativeRows.push({ cohort: p.cohortMonth, months: p.monthsSincePurchase, rate: p.survivalRate, claims: p.claimCount, volume: p.purchaseVolume });
+      }
+    }
+  }
+
+  console.log(`Raw min: ${rawMin.toFixed(1)}%,  Raw max: ${rawMax.toFixed(1)}%`);
+  console.log(`Clamped min (colour scale): ${clampedMin.toFixed(1)}%,  Clamped max: ${clampedMax.toFixed(1)}%`);
+  console.log(`Negative survival rate cells: ${negativeRows.length}`);
+  if (negativeRows.length > 0) {
+    console.log("Top 10 worst (most negative):");
+    negativeRows.sort((a, b) => a.rate - b.rate).slice(0, 10).forEach(r => {
+      console.log(`  ${r.cohort} month+${r.months}: ${r.rate.toFixed(1)}%  (${r.claims} claims / ${r.volume} units)`);
+    });
   }
 }
 
