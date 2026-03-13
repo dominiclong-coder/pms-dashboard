@@ -218,60 +218,64 @@ export function PurchaseVolumeModal({
             </span>
           ))}
 
-          {currentLots.length > 0 && (
-            <span className="ml-auto text-sm text-slate-400">
-              Total: <span className="font-semibold text-slate-600">{productTotal.toLocaleString()}</span> units
-            </span>
-          )}
+          <span className="ml-auto text-sm text-slate-400">
+            Total: <span className="font-semibold text-slate-600">{productTotal.toLocaleString()}</span> units
+          </span>
         </div>
 
         {/* Table */}
         <div className="flex-1 overflow-auto px-6 py-4">
-          {currentLots.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-slate-400">
-              <p className="text-sm">No lots added yet.</p>
-              <p className="text-sm">Type a lot number above and click <strong>Add</strong>.</p>
-            </div>
-          ) : (
-            <table className="w-full border-collapse text-sm">
-              <thead className="sticky top-0 bg-white">
-                <tr>
-                  <th className="text-left px-3 py-2 border-b-2 border-slate-200 font-semibold text-slate-600 w-28">
-                    Month
+          <table className="w-full border-collapse text-sm">
+            <thead className="sticky top-0 bg-white">
+              <tr>
+                <th className="text-left px-3 py-2 border-b-2 border-slate-200 font-semibold text-slate-600 w-28">
+                  Month
+                </th>
+                {currentLots.map((lot) => (
+                  <th key={lot} className="text-left px-3 py-2 border-b-2 border-slate-200 font-semibold text-slate-600 font-mono min-w-[130px]">
+                    {lot}
                   </th>
-                  {currentLots.map((lot) => (
-                    <th key={lot} className="text-left px-3 py-2 border-b-2 border-slate-200 font-semibold text-slate-600 font-mono min-w-[130px]">
-                      {lot}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {MONTHS.map((ym) => (
-                  <tr key={ym} className="hover:bg-slate-50">
-                    <td className="px-3 py-2 border-b border-slate-100 font-medium text-slate-600 whitespace-nowrap">
-                      {formatMonth(ym)}
-                    </td>
-                    {currentLots.map((lot) => {
-                      const val = volumes[volumeKey(ym, selectedProduct, lot)] || 0;
-                      return (
-                        <td key={lot} className="px-3 py-2 border-b border-slate-100">
-                          <input
-                            type="number"
-                            min="0"
-                            value={val || ""}
-                            onChange={(e) => handleChange(ym, lot, e.target.value)}
-                            placeholder="0"
-                            className="w-full px-2 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                          />
-                        </td>
-                      );
-                    })}
-                  </tr>
                 ))}
-              </tbody>
-            </table>
-          )}
+                <th className="text-left px-3 py-2 border-b-2 border-slate-200 font-semibold text-slate-400 min-w-[130px]">
+                  Unknown lot
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {MONTHS.map((ym) => (
+                <tr key={ym} className="hover:bg-slate-50">
+                  <td className="px-3 py-2 border-b border-slate-100 font-medium text-slate-600 whitespace-nowrap">
+                    {formatMonth(ym)}
+                  </td>
+                  {currentLots.map((lot) => {
+                    const val = volumes[volumeKey(ym, selectedProduct, lot)] || 0;
+                    return (
+                      <td key={lot} className="px-3 py-2 border-b border-slate-100">
+                        <input
+                          type="number"
+                          min="0"
+                          value={val || ""}
+                          onChange={(e) => handleChange(ym, lot, e.target.value)}
+                          placeholder="0"
+                          className="w-full px-2 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 border-b border-slate-100">
+                    <input
+                      type="number"
+                      min="0"
+                      value={volumes[volumeKey(ym, selectedProduct, "")] || ""}
+                      onChange={(e) => handleChange(ym, "", e.target.value)}
+                      placeholder="0"
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-400"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
         {/* Footer */}
