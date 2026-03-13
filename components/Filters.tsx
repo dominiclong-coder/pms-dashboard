@@ -203,7 +203,7 @@ export function Filters({ filterValues, filters, onFiltersChange }: FiltersProps
           </button>
         )}
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <DropdownMultiSelect
           label="Product Name"
           options={filterValues.productNames}
@@ -215,12 +215,6 @@ export function Filters({ filterValues, filters, onFiltersChange }: FiltersProps
           options={filterValues.skus}
           selected={filters.skus || []}
           onChange={(v) => updateFilter("skus", v)}
-        />
-        <DropdownMultiSelect
-          label="Serial Number"
-          options={filterValues.serialNumbers}
-          selected={filters.serialNumbers || []}
-          onChange={(v) => updateFilter("serialNumbers", v)}
         />
         <DropdownMultiSelect
           label="Lot Number"

@@ -40,7 +40,6 @@ export interface ChartDataPoint {
 export interface FilterValues {
   productNames: string[];
   skus: string[];
-  serialNumbers: string[];
   reasons: string[];
   subReasons: string[];
   purchaseChannels: string[];

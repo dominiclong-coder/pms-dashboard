@@ -236,7 +236,7 @@ export function PurchaseVolumeModal({
                     {lot}
                   </th>
                 ))}
-                <th className="text-left px-3 py-2 border-b-2 border-slate-200 font-semibold text-slate-400 min-w-[130px]">
+                <th className="text-left px-3 py-2 border-b-2 border-slate-200 font-semibold text-slate-600 min-w-[130px]">
                   Unknown lot
                 </th>
               </tr>
@@ -269,7 +269,7 @@ export function PurchaseVolumeModal({
                       value={volumes[volumeKey(ym, selectedProduct, "")] || ""}
                       onChange={(e) => handleChange(ym, "", e.target.value)}
                       placeholder="0"
-                      className="w-full px-2 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-400"
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     />
                   </td>
                 </tr>

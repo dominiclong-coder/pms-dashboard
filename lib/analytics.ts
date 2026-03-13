@@ -14,7 +14,6 @@ export interface ChartDataPoint {
 export interface FilterValues {
   productNames: string[];
   skus: string[];
-  serialNumbers: string[];
   reasons: string[];
   subReasons: string[];
   purchaseChannels: string[];
@@ -24,7 +23,6 @@ export interface FilterValues {
 export interface Filters {
   productNames?: string[];
   skus?: string[];
-  serialNumbers?: string[];
   reasons?: string[];
   subReasons?: string[];
   purchaseChannels?: string[];
@@ -113,7 +111,6 @@ function getPeriodLabel(periodKey: string, period: "weekly" | "monthly"): string
 export function extractFilterValues(registrations: Registration[]): FilterValues {
   const productNames = new Set<string>();
   const skus = new Set<string>();
-  const serialNumbers = new Set<string>();
   const reasons = new Set<string>();
   const subReasons = new Set<string>();
   const purchaseChannels = new Set<string>();
@@ -123,11 +120,6 @@ export function extractFilterValues(registrations: Registration[]): FilterValues
     const pn = getProductName(reg);
     if (pn) productNames.add(pn);
     if (reg.productSku) skus.add(reg.productSku);
-    if (reg.serialNumbers) {
-      for (const sn of reg.serialNumbers) {
-        serialNumbers.add(sn);
-      }
-    }
     if (reg.fieldData) {
       const reason = reg.fieldData["reason-for-claim"] as string;
       const subReason = reg.fieldData["reason-for-claim57"] as string;
@@ -144,7 +136,6 @@ export function extractFilterValues(registrations: Registration[]): FilterValues
   return {
     productNames: Array.from(productNames).sort(),
     skus: Array.from(skus).sort(),
-    serialNumbers: Array.from(serialNumbers).sort(),
     reasons: Array.from(reasons).sort(),
     subReasons: Array.from(subReasons).sort(),
     purchaseChannels: Array.from(purchaseChannels).sort(),
@@ -166,13 +157,6 @@ export function applyFilters(registrations: Registration[], filters: Filters): R
     // SKU filter
     if (filters.skus && filters.skus.length > 0) {
       if (!reg.productSku || !filters.skus.includes(reg.productSku)) {
-        return false;
-      }
-    }
-
-    // Serial Number filter
-    if (filters.serialNumbers && filters.serialNumbers.length > 0) {
-      if (!reg.serialNumbers || !reg.serialNumbers.some(sn => filters.serialNumbers!.includes(sn))) {
         return false;
       }
     }
@@ -286,7 +270,7 @@ export function calculateClaimsPercentageByPeriod(
 export type TimePeriod = "daily" | "weekly" | "monthly" | "yearly";
 
 // Grouping options for stacked bar chart
-export type GroupBy = "none" | "productName" | "sku" | "reason" | "purchaseChannel" | "serialNumber";
+export type GroupBy = "none" | "productName" | "sku" | "reason" | "purchaseChannel" | "lotNumber";
 
 export interface StackedChartDataPoint {
   period: string;
@@ -351,8 +335,8 @@ function getGroupValue(reg: Registration, groupBy: GroupBy): string {
       return (reg.fieldData?.["reason-for-claim"] as string) || "Unknown Reason";
     case "purchaseChannel":
       return (reg.fieldData?.["where-did-you-purchase-this-product-from-"] as string) || "Unknown Channel";
-    case "serialNumber":
-      return reg.serialNumbers?.[0] || "Unknown Serial";
+    case "lotNumber":
+      return getLotFromRegistration(reg) ?? "Unknown Lot";
     default:
       return "All Claims";
   }
@@ -457,7 +441,6 @@ export function combineFilterValues(filterValuesArray: FilterValues[]): FilterVa
   const combined: FilterValues = {
     productNames: [],
     skus: [],
-    serialNumbers: [],
     reasons: [],
     subReasons: [],
     purchaseChannels: [],
@@ -467,7 +450,6 @@ export function combineFilterValues(filterValuesArray: FilterValues[]): FilterVa
   for (const fv of filterValuesArray) {
     combined.productNames = [...new Set([...combined.productNames, ...fv.productNames])].sort();
     combined.skus = [...new Set([...combined.skus, ...fv.skus])].sort();
-    combined.serialNumbers = [...new Set([...combined.serialNumbers, ...fv.serialNumbers])].sort();
     combined.reasons = [...new Set([...combined.reasons, ...fv.reasons])].sort();
     combined.subReasons = [...new Set([...combined.subReasons, ...fv.subReasons])].sort();
     combined.purchaseChannels = [...new Set([...combined.purchaseChannels, ...fv.purchaseChannels])].sort();
