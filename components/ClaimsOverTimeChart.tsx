@@ -119,7 +119,7 @@ function ChartControls({
           <option value="sku">SKU</option>
           <option value="reason">Reason</option>
           <option value="purchaseChannel">Purchase Channel</option>
-          <option value="lotNumber">Lot Number</option>
+          <option value="serialNumber">Serial Number</option>
         </select>
       </div>
     </div>

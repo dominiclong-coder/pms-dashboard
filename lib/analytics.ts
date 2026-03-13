@@ -270,7 +270,7 @@ export function calculateClaimsPercentageByPeriod(
 export type TimePeriod = "daily" | "weekly" | "monthly" | "yearly";
 
 // Grouping options for stacked bar chart
-export type GroupBy = "none" | "productName" | "sku" | "reason" | "purchaseChannel" | "lotNumber";
+export type GroupBy = "none" | "productName" | "sku" | "reason" | "purchaseChannel" | "serialNumber";
 
 export interface StackedChartDataPoint {
   period: string;
@@ -335,8 +335,8 @@ function getGroupValue(reg: Registration, groupBy: GroupBy): string {
       return (reg.fieldData?.["reason-for-claim"] as string) || "Unknown Reason";
     case "purchaseChannel":
       return (reg.fieldData?.["where-did-you-purchase-this-product-from-"] as string) || "Unknown Channel";
-    case "lotNumber":
-      return getLotFromRegistration(reg) ?? "Unknown Lot";
+    case "serialNumber":
+      return reg.serialNumbers?.[0]?.trim() || "Unknown Serial";
     default:
       return "All Claims";
   }
