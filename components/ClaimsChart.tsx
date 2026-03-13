@@ -165,6 +165,7 @@ export function ClaimsChart({ title, data, color = "#3b82f6", controlLimits }: C
           </LineChart>
         </ResponsiveContainer>
       </div>
+      <p className="text-xs text-slate-400 mt-3">Valid claims (exposure within warranty/return window)</p>
     </div>
   );
 }

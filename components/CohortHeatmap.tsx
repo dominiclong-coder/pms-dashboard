@@ -240,6 +240,7 @@ export function CohortHeatmap({ data, maxMonths, startMonth, endMonth, globalMin
         <div className="w-4 h-4 rounded" style={{ backgroundColor: "#f1f5f9", border: "1px solid #e2e8f0" }} />
         <span>No purchase data</span>
       </div>
+      <p className="text-xs text-slate-400 mt-3">Valid claims (exposure within warranty/return window)</p>
     </div>
   );
 }

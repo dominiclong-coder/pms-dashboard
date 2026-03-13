@@ -301,6 +301,7 @@ export function ClaimsOverTimeChart({
           </LineChart>
         </ResponsiveContainer>
       </div>
+      <p className="text-xs text-slate-400 mt-3">All MyProductCares claims</p>
     </div>
   );
 }
