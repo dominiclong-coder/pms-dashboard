@@ -216,8 +216,9 @@ export function ClaimsOverTimeChart({
   };
 
   // Prepare data with short labels for display
+  // Strip otherBreakdown (an object) — recharts can't handle non-primitive values when animating
   const chartData = useMemo(() => {
-    return data.map((d) => ({
+    return data.map(({ otherBreakdown: _ignored, ...d }) => ({
       ...d,
       shortLabel: getShortLabel(d.periodLabel, timePeriod),
     }));
