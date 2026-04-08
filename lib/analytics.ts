@@ -632,7 +632,8 @@ export function calculateCohortSurvival(
     // Filter by lot (from serialNumbers[0]) if specified
     if (lotFilter && lotFilter.length > 0) {
       const regLot = getLotFromRegistration(reg);
-      if (!lotFilter.includes(regLot ?? "")) return false;
+      const lotKey = regLot ?? "Unknown";
+      if (!lotFilter.includes(lotKey)) return false;
     }
 
     return true;
@@ -674,7 +675,7 @@ export function calculateCohortSurvival(
   // so existing data continues to work without a re-import.
   const volumeMap = new Map<string, number>();
   for (const pv of purchaseVolumes) {
-    if (lotFilter && lotFilter.length > 0 && !lotFilter.includes((pv.lot ?? "").toUpperCase())) continue;
+    if (lotFilter && lotFilter.length > 0 && !lotFilter.includes(pv.lot ? pv.lot.toUpperCase() : "Unknown")) continue;
     const product = pv.product === "Zima Go/Zima UV Case/Zima Case Air"
       ? "Zima Go/Zima UV Case"
       : pv.product;

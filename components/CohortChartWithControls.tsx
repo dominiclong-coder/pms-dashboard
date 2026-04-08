@@ -106,13 +106,18 @@ export function CohortChartWithControls({
   // Derive available lots for the selected product from purchase volumes
   const availableLots = useMemo(() => {
     const lots = new Set<string>();
+    let hasUnknown = false;
     for (const pv of purchaseVolumes) {
-      if (!pv.lot) continue;
-      if (productFilter === "All Products" || pv.product === productFilter) {
+      if (productFilter !== "All Products" && pv.product !== productFilter) continue;
+      if (!pv.lot) {
+        hasUnknown = true;
+      } else {
         lots.add(pv.lot.toUpperCase());
       }
     }
-    return Array.from(lots).sort();
+    const sorted = Array.from(lots).sort();
+    if (hasUnknown) sorted.push("Unknown");
+    return sorted;
   }, [purchaseVolumes, productFilter]);
 
   // Reset lot filter when product changes
