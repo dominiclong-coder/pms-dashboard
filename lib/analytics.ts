@@ -504,6 +504,70 @@ export function extractProductType(productName: string | undefined): string {
   return "Other";
 }
 
+// Lot number → canonical product type mapping
+// Used as a fallback when the product name field is blank or unrecognisable
+const LOT_TO_PRODUCT: Record<string, string> = {
+  "202201":     "Dental Pod",
+  "202204":     "Dental Pod",
+  "202206":     "Dental Pod",
+  "202209":     "Dental Pod",
+  "202211":     "Dental Pod",
+  "202302":     "Dental Pod",
+  "202305":     "Dental Pod",
+  "202305-N":   "Dental Pod",
+  "202308":     "Dental Pod",
+  "202311":     "Dental Pod",
+  "202401":     "Dental Pod",
+  "202405":     "Dental Pod",
+  "202409":     "Dental Pod",
+  "202412":     "Dental Pod",
+  "202501":     "Dental Pod",
+  "202503-DP":  "Dental Pod",
+  "202508-DP1": "Dental Pod",
+  "202509-DP":  "Dental Pod",
+  "202510-DP1": "Dental Pod",
+  "202511-DP":  "Dental Pod",
+  "202601-DP2": "Dental Pod",
+  "202410":     "Dental Pod Pro",
+  "202504-DPP": "Dental Pod Pro",
+  "202509-DPP": "Dental Pod Pro",
+  "202511-DPP": "Dental Pod Pro",
+  "202601-DPP": "Dental Pod Pro",
+  "202503-ZG":  "Zima Go/Zima UV Case",
+  "202509-ZG":  "Zima Go/Zima UV Case",
+  "202511-ZG":  "Zima Go/Zima UV Case",
+  "202510-ZCA": "Zima Case Air",
+  "202509-TP":  "Dental Pod Go",
+};
+
+// Sort lot keys longest-first so prefix matching picks the most specific lot
+const LOT_KEYS_BY_LENGTH = Object.keys(LOT_TO_PRODUCT).sort((a, b) => b.length - a.length);
+
+function getProductFromSerialNumber(serialNumber: string): string {
+  const sn = serialNumber.toUpperCase().trim();
+  for (const lot of LOT_KEYS_BY_LENGTH) {
+    if (sn === lot || sn.startsWith(lot + "-") || sn.startsWith(lot + " ")) {
+      return LOT_TO_PRODUCT[lot]!;
+    }
+  }
+  return "";
+}
+
+/**
+ * Returns the canonical product type for a registration.
+ * Tries the serial number lot lookup first (more reliable — physically on the device);
+ * falls back to the product name field if no serial number is present or unrecognised.
+ */
+export function getProductType(reg: Registration): string {
+  const sn = reg.serialNumbers?.[0]?.trim();
+  if (sn) {
+    const fromSerial = getProductFromSerialNumber(sn);
+    if (fromSerial) return fromSerial;
+  }
+
+  return extractProductType(getProductName(reg));
+}
+
 // Calculate months between two dates using DATEDIF logic (complete months elapsed)
 function calculateMonthsBetween(startDate: string, endDate: string): number {
   const start = new Date(startDate);
@@ -548,8 +612,8 @@ export function calculateCohortSurvival(
       }
     }
 
-    // Filter by product
-    const productType = extractProductType(getProductName(reg));
+    // Filter by product (name first, serial number fallback)
+    const productType = getProductType(reg);
 
     if (productFilter === "All Products") {
       // Only include claims from products we're tracking
