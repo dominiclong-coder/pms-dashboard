@@ -5,6 +5,7 @@ import { Registration, PurchaseVolume, PurchaseVolumeData } from "@/lib/types";
 import { calculateCohortSurvival } from "@/lib/analytics";
 import { CohortHeatmap } from "./CohortHeatmap";
 import { PurchaseVolumeModal } from "./PurchaseVolumeModal";
+import { DropdownMultiSelect } from "./Filters";
 
 interface CohortChartWithControlsProps {
   registrations: Registration[];
@@ -97,7 +98,7 @@ export function CohortChartWithControls({
   const availableMonths = useMemo(() => generateAvailableMonths(), []);
 
   const [productFilter, setProductFilter] = useState<string>("All Products");
-  const [lotFilter, setLotFilter] = useState<string>("");
+  const [lotFilter, setLotFilter] = useState<string[]>([]);
   const [startMonth, setStartMonth] = useState<string>("");
   const [endMonth, setEndMonth] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -116,7 +117,7 @@ export function CohortChartWithControls({
 
   // Reset lot filter when product changes
   useEffect(() => {
-    setLotFilter("");
+    setLotFilter([]);
   }, [productFilter]);
 
   // Set defaults based on claim type
@@ -135,7 +136,7 @@ export function CohortChartWithControls({
       startMonth,
       endMonth,
       claimType,
-      lotFilter || undefined
+      lotFilter.length > 0 ? lotFilter : undefined
     );
   }, [registrations, purchaseVolumes, productFilter, startMonth, endMonth, claimType, lotFilter]);
 
@@ -201,19 +202,12 @@ export function CohortChartWithControls({
 
           {/* Lot Filter */}
           {availableLots.length > 0 && (
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-slate-600 font-medium">Lot:</label>
-              <select
-                value={lotFilter}
-                onChange={(e) => setLotFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-              >
-                <option value="">All Lots</option>
-                {availableLots.map((lot) => (
-                  <option key={lot} value={lot}>{lot}</option>
-                ))}
-              </select>
-            </div>
+            <DropdownMultiSelect
+              label="Lot"
+              options={availableLots}
+              selected={lotFilter}
+              onChange={setLotFilter}
+            />
           )}
 
           {/* Start Month */}

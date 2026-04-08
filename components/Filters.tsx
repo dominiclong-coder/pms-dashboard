@@ -16,7 +16,7 @@ interface DropdownMultiSelectProps {
   onChange: (selected: string[]) => void;
 }
 
-function DropdownMultiSelect({ label, options, selected, onChange }: DropdownMultiSelectProps) {
+export function DropdownMultiSelect({ label, options, selected, onChange }: DropdownMultiSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);

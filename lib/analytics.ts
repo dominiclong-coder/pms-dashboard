@@ -592,7 +592,7 @@ export function calculateCohortSurvival(
   startMonth: string,      // "2024-01"
   endMonth: string,        // "2024-12"
   claimType: "warranty" | "return",
-  lotFilter?: string       // e.g. "202503-DP" — filters both claims and purchase volumes
+  lotFilter?: string[]     // e.g. ["202503-DP", "202504-DP"] — filters both claims and purchase volumes
 ): CohortDataPoint[] {
   // 1. Filter registrations by valid exposure, product, and optional lot
   const validRegistrations = registrations.filter((reg) => {
@@ -630,9 +630,9 @@ export function calculateCohortSurvival(
     }
 
     // Filter by lot (from serialNumbers[0]) if specified
-    if (lotFilter) {
+    if (lotFilter && lotFilter.length > 0) {
       const regLot = getLotFromRegistration(reg);
-      if (regLot !== lotFilter) return false;
+      if (!lotFilter.includes(regLot ?? "")) return false;
     }
 
     return true;
@@ -674,7 +674,7 @@ export function calculateCohortSurvival(
   // so existing data continues to work without a re-import.
   const volumeMap = new Map<string, number>();
   for (const pv of purchaseVolumes) {
-    if (lotFilter && (pv.lot ?? "").toUpperCase() !== lotFilter) continue;
+    if (lotFilter && lotFilter.length > 0 && !lotFilter.includes((pv.lot ?? "").toUpperCase())) continue;
     const product = pv.product === "Zima Go/Zima UV Case/Zima Case Air"
       ? "Zima Go/Zima UV Case"
       : pv.product;
