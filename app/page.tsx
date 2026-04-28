@@ -96,7 +96,7 @@ export default function Dashboard() {
   const [registrationsByForm, setRegistrationsByForm] = useState<Record<string, Registration[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [refreshProgress, setRefreshProgress] = useState<{ form: string; count: number } | null>(null);
+  const [refreshProgress, setRefreshProgress] = useState<{ form: string; count: number; phase?: string; page?: number; totalPages?: number } | null>(null);
   const [staticDataTimestamp, setStaticDataTimestamp] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [newClaimsCount, setNewClaimsCount] = useState(0);
@@ -131,8 +131,8 @@ export default function Dashboard() {
           claimTypeInfo.slug,
           staticDataTimestamp,
           existingIds,
-          (count) => {
-            setRefreshProgress({ form: claimTypeInfo.name, count });
+          (count, phase, page, totalPages) => {
+            setRefreshProgress({ form: claimTypeInfo.name, count, phase, page, totalPages });
           },
           forceFullScan
         );
@@ -348,10 +348,19 @@ export default function Dashboard() {
           <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center gap-3">
               <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-              <p className="text-blue-800">
-                Checking for new {refreshProgress.form}...
-                {refreshProgress.count > 0 && ` (${refreshProgress.count} found)`}
-              </p>
+              <div className="text-blue-800 text-sm">
+                <span className="font-medium">{refreshProgress.form}</span>
+                {refreshProgress.phase && <span> — {refreshProgress.phase}</span>}
+                {refreshProgress.page && refreshProgress.totalPages && (
+                  <span className="text-blue-600"> (page {refreshProgress.page} of ~{refreshProgress.totalPages})</span>
+                )}
+                {refreshProgress.page && !refreshProgress.totalPages && (
+                  <span className="text-blue-600"> (page {refreshProgress.page})</span>
+                )}
+                {refreshProgress.count > 0 && (
+                  <span className="ml-2 text-blue-700 font-medium">· {refreshProgress.count} new records found</span>
+                )}
+              </div>
             </div>
           </div>
         )}

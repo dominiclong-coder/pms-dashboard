@@ -65,7 +65,8 @@ async function fetchPage(
 
   const result = await response.json();
   const data = result.data || [];
-  const total = result.total ?? result.meta?.total ?? 0;
+  const total = result.total ?? result.meta?.total ?? result.pagination?.total ?? result.count ?? 0;
+  if (page === 1) console.log(`API response keys: ${Object.keys(result).join(", ")}, total: ${total}`);
 
   return {
     data,
@@ -80,7 +81,7 @@ export async function fetchNewestRegistrations(
   formSlug: string,
   sinceTimestamp: string,
   existingIds: Set<string | number>,
-  onProgress?: (count: number) => void,
+  onProgress?: (count: number, phase?: string, page?: number, totalPages?: number) => void,
   forceFullScan?: boolean
 ): Promise<Registration[]> {
   // Skip refresh if Firebase has no data for this claim type
@@ -110,35 +111,63 @@ export async function fetchNewestRegistrations(
   const newRegistrations: Registration[] = [];
 
   const fullScan = forceFullScan || gap > 100;
+  const estimatedTotalPages = fullScan && apiTotal > 0 ? Math.ceil(apiTotal / 2) : undefined;
+
   if (fullScan) {
-    console.log(`Large gap detected (${gap}), running full scan for ${formSlug}...`);
+    console.log(`Running full scan for ${formSlug} (gap: ${gap}, ~${estimatedTotalPages} pages)...`);
   }
 
+  // Phase 1: bulk scan with limit=100 to cover historical records quickly (full scan only)
+  if (fullScan) {
+    const bulkTotalPages = apiTotal > 0 ? Math.ceil(apiTotal / 100) : undefined;
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore && page <= 500) {
+      try {
+        const result = await fetchPage(page, 100, formSlug);
+        for (const reg of result.data) {
+          if (!existingIds.has(reg.id)) newRegistrations.push(reg);
+        }
+        if (onProgress) onProgress(newRegistrations.length, "Bulk scan", page, bulkTotalPages);
+        hasMore = result.hasMore;
+        page++;
+        await sleep(1000);
+      } catch (error) {
+        console.error(`Bulk scan error at page ${page}:`, error);
+        break;
+      }
+    }
+  }
+
+  // Phase 2: fast scan with limit=2 — catches recent records the API misses at limit=100,
+  // or (for non-full-scan) just picks up any new records since last sync.
+  // In a full scan, cap at 100 pages (~200 records) since the bulk scan already covered history.
   {
+    const allFoundIds = new Set([...existingIds, ...newRegistrations.map(r => r.id)]);
     let page = 1;
     const limit = 2;
+    const pageLimit = fullScan ? 100 : 300; // 300 pages = 600 records max for normal refresh
     let consecutiveOldPages = 0;
 
-    while (true) {
+    while (page <= pageLimit) {
       try {
         const { data, hasMore } = await fetchPage(page, limit, formSlug);
 
         let newInThisPage = 0;
         for (const reg of data) {
-          if (!existingIds.has(reg.id)) {
+          if (!allFoundIds.has(reg.id)) {
             newRegistrations.push(reg);
+            allFoundIds.add(reg.id);
             newInThisPage++;
           }
         }
 
-        if (onProgress) onProgress(newRegistrations.length);
+        if (onProgress) onProgress(newRegistrations.length, fullScan ? "Catching recent records" : "Checking for new records", page, fullScan ? 100 : undefined);
 
         if (newInThisPage === 0) {
           consecutiveOldPages++;
-          // Full scan: go all the way to the end to catch any historical gaps
-          // Fast scan: stop early once we've caught up
-          if (!fullScan && consecutiveOldPages >= 5) break;
-          if (fullScan && !hasMore) break;
+          if (consecutiveOldPages >= 5) break;
         } else {
           consecutiveOldPages = 0;
         }
@@ -147,7 +176,7 @@ export async function fetchNewestRegistrations(
         page++;
         await sleep(1000);
       } catch (error) {
-        console.error(`Error fetching page ${page}:`, error);
+        console.error(`Fast scan error at page ${page}:`, error);
         break;
       }
     }
