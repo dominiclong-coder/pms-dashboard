@@ -30,7 +30,7 @@ export interface Filters {
 }
 
 /** Extract and normalise the lot number a customer entered (first serial number). */
-function getLotFromRegistration(reg: Registration): string | null {
+export function getLotFromRegistration(reg: Registration): string | null {
   const raw = reg.serialNumbers?.[0]?.trim();
   if (!raw) return null;
   const sn = raw.toUpperCase();
@@ -760,4 +760,176 @@ export function calculateCohortSurvival(
   }
 
   return dataPoints;
+}
+
+// ─── Daily Launch Tracker ─────────────────────────────────────────────────────
+
+export interface LaunchSeries {
+  id: string;
+  label: string;
+  product: string;       // e.g. "Dental Pod" or "All Products"
+  lots: string[];        // [] means all lots
+  startDate: string;     // "YYYY-MM-DD"
+  color: string;
+}
+
+export interface DailyDataPoint {
+  day: number;
+  claimsCount: number;
+  cohortSize: number;
+  claimRate: number;     // percentage 0-100
+}
+
+/** Number of days in a month given a "YYYY-MM" yearMonth string. */
+function daysInMonth(yearMonth: string): number {
+  const [year, month] = yearMonth.split("-").map(Number);
+  return new Date(year, month, 0).getDate();
+}
+
+/** Tracked products used when filtering "All Products". */
+const TRACKED_PRODUCTS = [
+  "Dental Pod",
+  "Dental Pod Go",
+  "Dental Pod Pro",
+  "Zima Go/Zima UV Case",
+];
+
+/** Valid purchase channels for warranty claims. */
+const VALID_WARRANTY_CHANNELS = ["Shop App", "Zima Dental Website", "Zima Dental Website or Shop App"];
+
+/**
+ * Calculates daily cumulative claim rate from a launch start date.
+ * For each day 0–maxDays:
+ *   - claimsCount = registrations filed within `day` days of shopify order
+ *   - cohortSize  = purchases from startDate up to (today - day days), prorated
+ *   - claimRate   = claimsCount / cohortSize * 100
+ */
+export function calculateDailyLaunchSurvival(
+  registrations: Registration[],
+  purchaseVolumes: PurchaseVolume[],
+  series: LaunchSeries,
+  maxDays: number,
+  claimType: "warranty" | "return",
+  today?: Date
+): DailyDataPoint[] {
+  const now = today ?? new Date();
+
+  // Filter registrations
+  const filtered = registrations.filter((reg) => {
+    if (!reg.shopifyOrderCreatedAt || !reg.createdAt) return false;
+
+    // Valid exposure check
+    const exposureDays = Math.floor(
+      (new Date(reg.createdAt).getTime() - new Date(reg.shopifyOrderCreatedAt).getTime()) / 86400000
+    );
+    if (!isValidExposure(exposureDays, claimType)) return false;
+
+    // Warranty: valid purchase channel only
+    if (claimType === "warranty") {
+      const channel = reg.fieldData?.["where-did-you-purchase-this-product-from-"] as string | undefined;
+      if (!channel || !VALID_WARRANTY_CHANNELS.includes(channel)) return false;
+    }
+
+    // Must have been purchased on or after startDate
+    const purchaseDateStr = reg.shopifyOrderCreatedAt.split("T")[0];
+    if (purchaseDateStr < series.startDate) return false;
+
+    // Product filter
+    const productType = getProductType(reg);
+    if (series.product === "All Products") {
+      if (!TRACKED_PRODUCTS.includes(productType)) return false;
+    } else {
+      if (productType !== series.product) return false;
+    }
+
+    // Lot filter
+    if (series.lots.length > 0) {
+      const regLot = getLotFromRegistration(reg);
+      if (!regLot || !series.lots.includes(regLot)) return false;
+    }
+
+    return true;
+  });
+
+  // Filter purchase volumes for this series
+  const relevantVolumes = purchaseVolumes.filter((pv) => {
+    const product = pv.product === "Zima Go/Zima UV Case/Zima Case Air"
+      ? "Zima Go/Zima UV Case"
+      : pv.product;
+
+    if (series.product === "All Products") {
+      if (!TRACKED_PRODUCTS.includes(product)) return false;
+    } else {
+      if (product !== series.product) return false;
+    }
+
+    if (series.lots.length > 0) {
+      const pvLot = pv.lot ? pv.lot.toUpperCase() : null;
+      if (!pvLot || !series.lots.includes(pvLot)) return false;
+    }
+
+    return true;
+  });
+
+  const result: DailyDataPoint[] = [];
+
+  for (let day = 0; day <= maxDays; day++) {
+    // claimsCount: cumulative claims filed within `day` days of shopify order
+    const claimsCount = filtered.filter((reg) => {
+      const daysBetween = Math.floor(
+        (new Date(reg.createdAt!).getTime() - new Date(reg.shopifyOrderCreatedAt!).getTime()) / 86400000
+      );
+      return daysBetween <= day;
+    }).length;
+
+    // cohortSize: purchases from startDate to (today - day days)
+    const cutoffDate = new Date(now.getTime() - day * 86400000);
+    const cutoffStr = cutoffDate.toISOString().split("T")[0];
+
+    let cohortSize = 0;
+    for (const pv of relevantVolumes) {
+      const ymStart = `${pv.yearMonth}-01`;
+      const ymEndYear = parseInt(pv.yearMonth.split("-")[0]);
+      const ymEndMonth = parseInt(pv.yearMonth.split("-")[1]);
+      const lastDay = daysInMonth(pv.yearMonth);
+      const ymEnd = `${pv.yearMonth}-${String(lastDay).padStart(2, "0")}`;
+
+      // Month is entirely before startDate or entirely after cutoffDate — skip
+      if (ymEnd < series.startDate || ymStart > cutoffStr) continue;
+
+      if (pv.dailyCounts) {
+        // Use daily counts — sum days in [startDate, cutoffStr]
+        for (const [dateStr, count] of Object.entries(pv.dailyCounts)) {
+          if (dateStr >= series.startDate && dateStr <= cutoffStr) {
+            cohortSize += count;
+          }
+        }
+      } else {
+        // Prorate monthly purchaseCount across days in month
+        const dailyRate = pv.purchaseCount / daysInMonth(pv.yearMonth);
+
+        // Count days in [startDate, cutoffStr] that fall within this month
+        const rangeStart = series.startDate > ymStart ? series.startDate : ymStart;
+        const rangeEnd = cutoffStr < ymEnd ? cutoffStr : ymEnd;
+
+        if (rangeStart <= rangeEnd) {
+          const startD = new Date(rangeStart);
+          const endD = new Date(rangeEnd);
+          const days = Math.floor((endD.getTime() - startD.getTime()) / 86400000) + 1;
+          cohortSize += dailyRate * days;
+        }
+      }
+    }
+
+    const claimRate = cohortSize > 0 ? (claimsCount / cohortSize) * 100 : 0;
+
+    result.push({
+      day,
+      claimsCount,
+      cohortSize: Math.round(cohortSize),
+      claimRate,
+    });
+  }
+
+  return result;
 }

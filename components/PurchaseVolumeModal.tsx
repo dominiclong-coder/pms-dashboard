@@ -17,11 +17,12 @@ const PRODUCTS: { id: string; label: string }[] = [
   { id: "Zima Go/Zima UV Case",                label: "Zima Go/Zima UV Case" },
 ];
 
-// Fixed month range: Dec 2024 → Mar 2026, most recent first
+// Dynamic month range: Dec 2024 → 3 months ahead of today, most recent first
 const MONTHS: string[] = (() => {
   const list: string[] = [];
   const start = new Date(2024, 11, 1); // Dec 2024
-  const end   = new Date(2026,  2, 1); // Mar 2026
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth() + 3, 1); // 3 months ahead
   for (let d = new Date(end); d >= start; d.setMonth(d.getMonth() - 1)) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -37,9 +38,19 @@ function formatMonth(ym: string): string {
   return `${MONTH_NAMES[parseInt(m) - 1]} ${y}`;
 }
 
+function daysInMonth(ym: string): number {
+  const [year, month] = ym.split("-").map(Number);
+  return new Date(year, month, 0).getDate();
+}
+
 // Volume key: "yearMonth|productId|LOT"
 function volumeKey(ym: string, product: string, lot: string): string {
   return `${ym}|${product}|${lot.toUpperCase()}`;
+}
+
+// Daily volume key: "YYYY-MM-DD|productId|LOT"
+function dailyVolumeKey(date: string, product: string, lot: string): string {
+  return `${date}|${product}|${lot.toUpperCase()}`;
 }
 
 export function PurchaseVolumeModal({
@@ -51,6 +62,8 @@ export function PurchaseVolumeModal({
   const [selectedProduct, setSelectedProduct] = useState(PRODUCTS[0].id);
   const [lotsByProduct, setLotsByProduct]     = useState<Record<string, string[]>>({});
   const [volumes, setVolumes]                 = useState<Record<string, number>>({});
+  const [dailyVolumes, setDailyVolumes]       = useState<Record<string, number>>({});
+  const [expandedMonths, setExpandedMonths]   = useState<Set<string>>(new Set());
   const [newLot, setNewLot]                   = useState("");
   const [isSaving, setIsSaving]               = useState(false);
   const [error, setError]                     = useState<string | null>(null);
@@ -59,6 +72,7 @@ export function PurchaseVolumeModal({
   useEffect(() => {
     if (!isOpen) return;
     const vols: Record<string, number> = {};
+    const dailyVols: Record<string, number> = {};
     const lots: Record<string, string[]> = {};
 
     for (const pv of purchaseVolumes) {
@@ -68,9 +82,20 @@ export function PurchaseVolumeModal({
         if (!lots[pv.product]) lots[pv.product] = [];
         if (!lots[pv.product].includes(lot)) lots[pv.product].push(lot);
       }
+
+      // Load daily counts
+      if (pv.dailyCounts) {
+        for (const [dateStr, count] of Object.entries(pv.dailyCounts)) {
+          if (count > 0) {
+            dailyVols[dailyVolumeKey(dateStr, pv.product, lot)] = count;
+          }
+        }
+      }
     }
     setVolumes(vols);
+    setDailyVolumes(dailyVols);
     setLotsByProduct(lots);
+    setExpandedMonths(new Set());
   }, [purchaseVolumes, isOpen]);
 
   if (!isOpen) return null;
@@ -103,6 +128,14 @@ export function PurchaseVolumeModal({
       }
       return next;
     });
+    setDailyVolumes((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next)) {
+        const parts = key.split("|");
+        if (parts[1] === selectedProduct && parts[2] === lot) delete next[key];
+      }
+      return next;
+    });
   };
 
   const handleChange = (ym: string, lot: string, value: string) => {
@@ -111,22 +144,87 @@ export function PurchaseVolumeModal({
     setVolumes((prev) => ({ ...prev, [volumeKey(ym, selectedProduct, lot)]: num }));
   };
 
+  const handleDailyChange = (dateStr: string, lot: string, value: string) => {
+    const num = value === "" ? 0 : parseInt(value, 10);
+    if (value !== "" && (isNaN(num) || num < 0)) return;
+    setDailyVolumes((prev) => ({
+      ...prev,
+      [dailyVolumeKey(dateStr, selectedProduct, lot)]: num,
+    }));
+  };
+
+  const toggleMonth = (ym: string) => {
+    setExpandedMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(ym)) next.delete(ym);
+      else next.add(ym);
+      return next;
+    });
+  };
+
+  // Get sum of daily entries for a month/lot combination
+  const getDailySum = (ym: string, lot: string): number => {
+    const [year, month] = ym.split("-");
+    const days = daysInMonth(ym);
+    let sum = 0;
+    for (let d = 1; d <= days; d++) {
+      const dateStr = `${year}-${month}-${String(d).padStart(2, "0")}`;
+      sum += dailyVolumes[dailyVolumeKey(dateStr, selectedProduct, lot)] || 0;
+    }
+    return sum;
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     setError(null);
     try {
-      const volumeArray: PurchaseVolume[] = [];
+      // Build a map keyed by "yearMonth|product|lot" holding all the data we need
+      const volumeMap = new Map<string, { yearMonth: string; product: string; lot: string | null; purchaseCount: number; dailyCounts: Record<string, number> }>();
+
+      // Seed from monthly volumes
       for (const [key, count] of Object.entries(volumes)) {
         if (count > 0) {
           const parts = key.split("|");
-          volumeArray.push({
-            yearMonth:     parts[0] ?? "",
-            product:       parts[1] ?? "",
-            lot:           parts[2] || null,
-            purchaseCount: count,
-          });
+          const ym = parts[0] ?? "";
+          const product = parts[1] ?? "";
+          const lotStr = parts[2] || null;
+          const mapKey = `${ym}|${product}|${lotStr ?? ""}`;
+          if (!volumeMap.has(mapKey)) {
+            volumeMap.set(mapKey, { yearMonth: ym, product, lot: lotStr, purchaseCount: count, dailyCounts: {} });
+          } else {
+            volumeMap.get(mapKey)!.purchaseCount = count;
+          }
         }
       }
+
+      // Add daily volumes
+      for (const [key, count] of Object.entries(dailyVolumes)) {
+        if (count > 0) {
+          const parts = key.split("|");
+          // key format: "YYYY-MM-DD|product|LOT"
+          const dateStr = parts[0] ?? "";
+          const product = parts[1] ?? "";
+          const lotStr = parts[2] || null;
+          const ym = dateStr.substring(0, 7); // "YYYY-MM"
+          const mapKey = `${ym}|${product}|${lotStr ?? ""}`;
+
+          if (!volumeMap.has(mapKey)) {
+            // Monthly entry may be 0 — still create a record so daily data is saved
+            const monthlyCount = volumes[volumeKey(ym, product, lotStr ?? "")] || 0;
+            volumeMap.set(mapKey, { yearMonth: ym, product, lot: lotStr, purchaseCount: monthlyCount, dailyCounts: {} });
+          }
+          volumeMap.get(mapKey)!.dailyCounts[dateStr] = count;
+        }
+      }
+
+      const volumeArray: PurchaseVolume[] = Array.from(volumeMap.values()).map((entry) => ({
+        yearMonth: entry.yearMonth,
+        product: entry.product,
+        lot: entry.lot,
+        purchaseCount: entry.purchaseCount,
+        ...(Object.keys(entry.dailyCounts).length > 0 ? { dailyCounts: entry.dailyCounts } : {}),
+      }));
+
       await onSave({ volumes: volumeArray, lastUpdated: new Date().toISOString() });
       onClose();
     } catch (err) {
@@ -228,52 +326,131 @@ export function PurchaseVolumeModal({
           <table className="w-full border-collapse text-sm">
             <thead className="sticky top-0 bg-white">
               <tr>
-                <th className="text-left px-3 py-2 border-b-2 border-slate-200 font-semibold text-slate-600 w-28">
+                <th className="text-left px-3 py-2 border-b-2 border-slate-200 font-semibold text-slate-600 w-36">
                   Month
                 </th>
                 {currentLots.map((lot) => (
-                  <th key={lot} className="text-left px-3 py-2 border-b-2 border-slate-200 font-semibold text-slate-600 font-mono min-w-[130px]">
+                  <th key={lot} className="text-left px-3 py-2 border-b-2 border-slate-200 font-semibold text-slate-600 font-mono min-w-[150px]">
                     {lot}
                   </th>
                 ))}
-                <th className="text-left px-3 py-2 border-b-2 border-slate-200 font-semibold text-slate-600 min-w-[130px]">
+                <th className="text-left px-3 py-2 border-b-2 border-slate-200 font-semibold text-slate-600 min-w-[150px]">
                   Unknown lot
                 </th>
               </tr>
             </thead>
             <tbody>
-              {MONTHS.map((ym) => (
-                <tr key={ym} className="hover:bg-slate-50">
-                  <td className="px-3 py-2 border-b border-slate-100 font-medium text-slate-600 whitespace-nowrap">
-                    {formatMonth(ym)}
-                  </td>
-                  {currentLots.map((lot) => {
-                    const val = volumes[volumeKey(ym, selectedProduct, lot)] || 0;
-                    return (
-                      <td key={lot} className="px-3 py-2 border-b border-slate-100">
-                        <input
-                          type="number"
-                          min="0"
-                          value={val || ""}
-                          onChange={(e) => handleChange(ym, lot, e.target.value)}
-                          placeholder="0"
-                          className="w-full px-2 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
+              {MONTHS.map((ym) => {
+                const isExpanded = expandedMonths.has(ym);
+                const [ymYear, ymMonth] = ym.split("-");
+                const days = daysInMonth(ym);
+
+                return (
+                  <>
+                    {/* Monthly row */}
+                    <tr key={ym} className="hover:bg-slate-50">
+                      <td className="px-3 py-2 border-b border-slate-100 font-medium text-slate-600 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => toggleMonth(ym)}
+                            className="text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+                            title={isExpanded ? "Collapse daily breakdown" : "Expand daily breakdown"}
+                          >
+                            <svg
+                              className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                          {formatMonth(ym)}
+                        </div>
                       </td>
-                    );
-                  })}
-                  <td className="px-3 py-2 border-b border-slate-100">
-                    <input
-                      type="number"
-                      min="0"
-                      value={volumes[volumeKey(ym, selectedProduct, "")] || ""}
-                      onChange={(e) => handleChange(ym, "", e.target.value)}
-                      placeholder="0"
-                      className="w-full px-2 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    />
-                  </td>
-                </tr>
-              ))}
+                      {currentLots.map((lot) => {
+                        const val = volumes[volumeKey(ym, selectedProduct, lot)] || 0;
+                        const dailySum = getDailySum(ym, lot);
+                        return (
+                          <td key={lot} className="px-3 py-2 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={val || ""}
+                                onChange={(e) => handleChange(ym, lot, e.target.value)}
+                                placeholder="0"
+                                className="w-24 px-2 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                              />
+                              {dailySum > 0 && (
+                                <span className="text-xs text-slate-400 whitespace-nowrap">(sum: {dailySum})</span>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      })}
+                      <td className="px-3 py-2 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            value={volumes[volumeKey(ym, selectedProduct, "")] || ""}
+                            onChange={(e) => handleChange(ym, "", e.target.value)}
+                            placeholder="0"
+                            className="w-24 px-2 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                          {(() => {
+                            const dailySum = getDailySum(ym, "");
+                            return dailySum > 0 ? (
+                              <span className="text-xs text-slate-400 whitespace-nowrap">(sum: {dailySum})</span>
+                            ) : null;
+                          })()}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Daily sub-rows */}
+                    {isExpanded && Array.from({ length: days }, (_, i) => i + 1).map((day) => {
+                      const dayStr = String(day).padStart(2, "0");
+                      const dateStr = `${ymYear}-${ymMonth}-${dayStr}`;
+                      const displayDate = `${dayStr}/${ymMonth}/${ymYear}`;
+
+                      return (
+                        <tr key={dateStr} className="bg-slate-50 hover:bg-slate-100">
+                          <td className="pl-8 pr-3 py-1 border-b border-slate-100 text-slate-500 text-xs font-mono whitespace-nowrap">
+                            {displayDate}
+                          </td>
+                          {currentLots.map((lot) => {
+                            const val = dailyVolumes[dailyVolumeKey(dateStr, selectedProduct, lot)] || 0;
+                            return (
+                              <td key={lot} className="px-3 py-1 border-b border-slate-100">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={val || ""}
+                                  onChange={(e) => handleDailyChange(dateStr, lot, e.target.value)}
+                                  placeholder="0"
+                                  className="w-24 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                                />
+                              </td>
+                            );
+                          })}
+                          <td className="px-3 py-1 border-b border-slate-100">
+                            <input
+                              type="number"
+                              min="0"
+                              value={dailyVolumes[dailyVolumeKey(dateStr, selectedProduct, "")] || ""}
+                              onChange={(e) => handleDailyChange(dateStr, "", e.target.value)}
+                              placeholder="0"
+                              className="w-24 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -283,7 +460,7 @@ export function PurchaseVolumeModal({
           {error ? (
             <p className="text-sm text-red-600">{error}</p>
           ) : (
-            <p className="text-xs text-slate-400">Lot numbers are stored in uppercase. Changes apply across all products.</p>
+            <p className="text-xs text-slate-400">Lot numbers are stored in uppercase. Click the chevron on any month to enter daily breakdowns.</p>
           )}
           <div className="flex gap-3 shrink-0">
             <button

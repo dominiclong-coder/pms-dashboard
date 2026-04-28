@@ -5,6 +5,7 @@ import { Filters } from "@/components/Filters";
 import { ClaimsChart } from "@/components/ClaimsChart";
 import { ClaimsOverTimeWithControls } from "@/components/ClaimsOverTimeChart";
 import { CohortChartWithControls } from "@/components/CohortChartWithControls";
+import { DailyLaunchChartWithControls } from "@/components/DailyLaunchChartWithControls";
 import { Tooltip } from "@/components/Tooltip";
 import {
   extractFilterValues,
@@ -219,6 +220,25 @@ export default function Dashboard() {
     return extractFilterValues(allRegistrations);
   }, [allRegistrations]);
 
+  // Compute available lots grouped by product (for DailyLaunchChartWithControls)
+  const availableLots = useMemo(() => {
+    const result: Record<string, string[]> = {};
+    for (const pv of purchaseVolumes) {
+      if (!pv.lot) continue;
+      const lot = pv.lot.toUpperCase();
+      const product = pv.product === "Zima Go/Zima UV Case/Zima Case Air"
+        ? "Zima Go/Zima UV Case"
+        : pv.product;
+      if (!result[product]) result[product] = [];
+      if (!result[product].includes(lot)) result[product].push(lot);
+    }
+    // Sort each product's lots
+    for (const product of Object.keys(result)) {
+      result[product].sort();
+    }
+    return result;
+  }, [purchaseVolumes]);
+
   // Apply filters and calculate chart data
   const filteredRegistrations = useMemo(() => {
     return applyFilters(registrations, filters);
@@ -411,6 +431,18 @@ export default function Dashboard() {
             claimType={claimType}
             onPurchaseVolumesUpdate={handlePurchaseVolumesUpdate}
           />
+        )}
+
+        {/* Daily Launch Tracker */}
+        {hasData && (
+          <div className="mt-6">
+            <DailyLaunchChartWithControls
+              registrations={registrations}
+              purchaseVolumes={purchaseVolumes}
+              claimType={claimType}
+              availableLots={availableLots}
+            />
+          </div>
         )}
 
         {/* Claims Over Time Chart */}

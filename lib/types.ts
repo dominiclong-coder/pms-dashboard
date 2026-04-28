@@ -51,6 +51,7 @@ export interface PurchaseVolume {
   product: string;          // "Dental Pod Go", "All Products", etc.
   lot: string | null;       // "202503-DP" | null (null for pre-June 2025 orders)
   purchaseCount: number;    // Number of units sold
+  dailyCounts?: Record<string, number>;  // { "2026-05-10": 20, "2026-05-11": 15 }
 }
 
 export interface PurchaseVolumeData {
