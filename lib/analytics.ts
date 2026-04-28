@@ -813,6 +813,7 @@ export function calculateDailyLaunchSurvival(
   today?: Date
 ): DailyDataPoint[] {
   const now = today ?? new Date();
+  const nowStr = now.toISOString().split("T")[0];
 
   // Filter registrations
   const filtered = registrations.filter((reg) => {
@@ -872,62 +873,67 @@ export function calculateDailyLaunchSurvival(
     return true;
   });
 
+  const startDateMs = new Date(series.startDate).getTime();
+
   const result: DailyDataPoint[] = [];
 
   for (let day = 0; day <= maxDays; day++) {
-    // claimsCount: cumulative claims filed within `day` days of shopify order
+    // Day N = N days after launch startDate.
+    // cohortCutoffStr = startDate + N days (capped at today if that date is in the future).
+    // This means the denominator grows as N increases: it's all units purchased in the
+    // first N days of the launch, and is fully settled once startDate+N is in the past.
+    const rawCutoff = new Date(startDateMs + day * 86400000).toISOString().split("T")[0];
+    const cohortCutoffStr = rawCutoff < nowStr ? rawCutoff : nowStr;
+
+    // claimsCount: of purchases in [startDate, cohortCutoffStr], how many had
+    // both (a) a claim date ≤ cohortCutoffStr and (b) claimed within `day` days of purchase.
+    // Both the purchase and the claim must have occurred within the first N days of launch.
     const claimsCount = filtered.filter((reg) => {
+      const purchaseDateStr = reg.shopifyOrderCreatedAt!.split("T")[0];
+      if (purchaseDateStr > cohortCutoffStr) return false;
+      const claimDateStr = reg.createdAt!.split("T")[0];
+      if (claimDateStr > cohortCutoffStr) return false;
       const daysBetween = Math.floor(
         (new Date(reg.createdAt!).getTime() - new Date(reg.shopifyOrderCreatedAt!).getTime()) / 86400000
       );
       return daysBetween <= day;
     }).length;
 
-    // cohortSize: purchases from startDate to (today - day days)
-    const cutoffDate = new Date(now.getTime() - day * 86400000);
-    const cutoffStr = cutoffDate.toISOString().split("T")[0];
-
-    let cohortSize = 0;
+    // cohortSize: total purchases from startDate to cohortCutoffStr
+    let cohortSizeRaw = 0;
     for (const pv of relevantVolumes) {
       const ymStart = `${pv.yearMonth}-01`;
-      const ymEndYear = parseInt(pv.yearMonth.split("-")[0]);
-      const ymEndMonth = parseInt(pv.yearMonth.split("-")[1]);
       const lastDay = daysInMonth(pv.yearMonth);
       const ymEnd = `${pv.yearMonth}-${String(lastDay).padStart(2, "0")}`;
 
-      // Month is entirely before startDate or entirely after cutoffDate — skip
-      if (ymEnd < series.startDate || ymStart > cutoffStr) continue;
+      if (ymEnd < series.startDate || ymStart > cohortCutoffStr) continue;
 
       if (pv.dailyCounts) {
-        // Use daily counts — sum days in [startDate, cutoffStr]
         for (const [dateStr, count] of Object.entries(pv.dailyCounts)) {
-          if (dateStr >= series.startDate && dateStr <= cutoffStr) {
-            cohortSize += count;
+          if (dateStr >= series.startDate && dateStr <= cohortCutoffStr) {
+            cohortSizeRaw += count;
           }
         }
       } else {
-        // Prorate monthly purchaseCount across days in month
         const dailyRate = pv.purchaseCount / daysInMonth(pv.yearMonth);
-
-        // Count days in [startDate, cutoffStr] that fall within this month
         const rangeStart = series.startDate > ymStart ? series.startDate : ymStart;
-        const rangeEnd = cutoffStr < ymEnd ? cutoffStr : ymEnd;
-
+        const rangeEnd = cohortCutoffStr < ymEnd ? cohortCutoffStr : ymEnd;
         if (rangeStart <= rangeEnd) {
           const startD = new Date(rangeStart);
           const endD = new Date(rangeEnd);
           const days = Math.floor((endD.getTime() - startD.getTime()) / 86400000) + 1;
-          cohortSize += dailyRate * days;
+          cohortSizeRaw += dailyRate * days;
         }
       }
     }
 
+    const cohortSize = Math.round(cohortSizeRaw);
     const claimRate = cohortSize > 0 ? (claimsCount / cohortSize) * 100 : 0;
 
     result.push({
       day,
       claimsCount,
-      cohortSize: Math.round(cohortSize),
+      cohortSize,
       claimRate,
     });
   }
