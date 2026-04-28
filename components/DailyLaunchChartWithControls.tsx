@@ -158,10 +158,12 @@ export function DailyLaunchChartWithControls({
       {/* Series config cards */}
       <div className="space-y-3 mb-5">
         {series.map((s) => {
-          const lotsForProduct =
-            s.product === "All Products"
+          const lotsForProduct = [
+            ...(s.product === "All Products"
               ? Array.from(new Set(Object.values(availableLots).flat())).sort()
-              : availableLots[s.product] ?? [];
+              : (availableLots[s.product] ?? []).sort()),
+            "Unknown",
+          ];
 
           return (
             <div

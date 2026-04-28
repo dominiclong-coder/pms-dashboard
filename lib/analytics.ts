@@ -845,7 +845,8 @@ export function calculateDailyLaunchSurvival(
     // Lot filter
     if (series.lots.length > 0) {
       const regLot = getLotFromRegistration(reg);
-      if (!regLot || !series.lots.includes(regLot)) return false;
+      const lotKey = regLot ?? "Unknown";
+      if (!series.lots.includes(lotKey)) return false;
     }
 
     return true;
@@ -864,8 +865,8 @@ export function calculateDailyLaunchSurvival(
     }
 
     if (series.lots.length > 0) {
-      const pvLot = pv.lot ? pv.lot.toUpperCase() : null;
-      if (!pvLot || !series.lots.includes(pvLot)) return false;
+      const pvLot = pv.lot ? pv.lot.toUpperCase() : "Unknown";
+      if (!series.lots.includes(pvLot)) return false;
     }
 
     return true;
