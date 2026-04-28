@@ -166,14 +166,9 @@ export function DailyLaunchChartWithControls({
           return (
             <div
               key={s.id}
-              className="border border-slate-200 rounded-lg flex overflow-hidden"
+              className="border border-slate-200 rounded-lg flex"
+              style={{ borderLeftColor: s.color, borderLeftWidth: "4px" }}
             >
-              {/* Colour sidebar */}
-              <div
-                className="w-1 flex-shrink-0"
-                style={{ backgroundColor: s.color }}
-              />
-
               <div className="flex-1 p-3 flex flex-wrap items-end gap-3">
                 {/* Label */}
                 <div className="flex flex-col gap-1">
