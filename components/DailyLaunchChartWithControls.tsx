@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -69,6 +69,8 @@ export function DailyLaunchChartWithControls({
   const [series, setSeries] = useState<LaunchSeries[]>(DEFAULT_SERIES);
   const [maxDays, setMaxDays] = useState(30);
   const [granularity, setGranularity] = useState(1);
+  const hoveredSeriesId = useRef<string | null>(null);
+  const [, forceTooltipUpdate] = useState(0);
 
   // x-axis tick days
   const xAxisDays = useMemo(() => {
@@ -102,17 +104,41 @@ export function DailyLaunchChartWithControls({
     return result;
   }, [registrations, purchaseVolumes, seriesWithData, maxDays, claimType]);
 
-  // Build chart data
+  // Build chart data — include claimsCount and cohortSize for tooltip
   const chartData = useMemo(() => {
     return xAxisDays.map((day) => {
       const point: Record<string, number> = { day };
       for (const s of seriesWithData) {
         const dp = seriesData[s.id]?.find((d) => d.day === day);
         point[s.id] = dp?.claimRate ?? 0;
+        point[`${s.id}_claims`] = dp?.claimsCount ?? 0;
+        point[`${s.id}_cohort`] = dp?.cohortSize ?? 0;
       }
       return point;
     });
   }, [xAxisDays, seriesWithData, seriesData]);
+
+  // Custom tooltip — shows only the hovered series with claims + cohort size
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const CustomTooltip = useCallback(({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    const targetId = hoveredSeriesId.current ?? seriesWithData[0]?.id;
+    if (!targetId) return null;
+    const p = payload.find((item: any) => item.dataKey === targetId);
+    if (!p) return null;
+    const s = seriesWithData.find((sr) => sr.id === targetId);
+    const claims = p.payload[`${targetId}_claims`] ?? 0;
+    const cohort = p.payload[`${targetId}_cohort`] ?? 0;
+    return (
+      <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-sm min-w-[180px]">
+        <p className="font-semibold mb-1" style={{ color: s?.color }}>{s?.label}</p>
+        <p className="text-slate-400 text-xs mb-2">Day {label}</p>
+        <p className="text-slate-700">Cumulative claims: <span className="font-semibold">{claims.toLocaleString()}</span></p>
+        <p className="text-slate-700">Purchase volume: <span className="font-semibold">{cohort.toLocaleString()}</span></p>
+        <p className="text-slate-400 text-xs mt-1">{Number(p.value ?? 0).toFixed(2)}% claim rate</p>
+      </div>
+    );
+  }, [seriesWithData]);
 
   const updateSeries = (id: string, patch: Partial<LaunchSeries>) => {
     setSeries((prev) =>
@@ -315,16 +341,7 @@ export function DailyLaunchChartWithControls({
               label={{ value: "Claim Rate", angle: -90, position: "insideLeft", offset: 10, fontSize: 12, fill: "#64748b" }}
               tick={{ fontSize: 12, fill: "#64748b" }}
             />
-            <Tooltip
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              formatter={(value: any, name: any) => {
-                const s = series.find((sr) => sr.id === String(name ?? ""));
-                const displayValue = typeof value === "number" ? `${value.toFixed(2)}%` : String(value ?? "");
-                return [displayValue, s?.label ?? String(name ?? "")];
-              }}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              labelFormatter={(label: any) => `Day ${label}`}
-            />
+            <Tooltip content={CustomTooltip} />
             <Legend
               formatter={(value: string) => {
                 const s = series.find((sr) => sr.id === value);
@@ -341,6 +358,14 @@ export function DailyLaunchChartWithControls({
                 dot={false}
                 activeDot={{ r: 4 }}
                 connectNulls
+                onMouseEnter={() => {
+                  hoveredSeriesId.current = s.id;
+                  forceTooltipUpdate((n) => n + 1);
+                }}
+                onMouseLeave={() => {
+                  hoveredSeriesId.current = null;
+                  forceTooltipUpdate((n) => n + 1);
+                }}
               />
             ))}
           </LineChart>
