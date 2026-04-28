@@ -49,7 +49,7 @@ async function fetchPage(
   page: number,
   limit: number,
   formSlug: string
-): Promise<{ data: Registration[]; hasMore: boolean }> {
+): Promise<{ data: Registration[]; hasMore: boolean; total: number }> {
   const url = `${API_BASE_URL}/registrations?page=${page}&limit=${limit}&formSlug=${formSlug}`;
 
   const response = await fetch(url, {
@@ -65,10 +65,12 @@ async function fetchPage(
 
   const result = await response.json();
   const data = result.data || [];
+  const total = result.total ?? result.meta?.total ?? 0;
 
   return {
     data,
     hasMore: data.length === limit,
+    total,
   };
 }
 
@@ -78,65 +80,80 @@ export async function fetchNewestRegistrations(
   formSlug: string,
   sinceTimestamp: string,
   existingIds: Set<string | number>,
-  onProgress?: (count: number) => void
+  onProgress?: (count: number) => void,
+  forceFullScan?: boolean
 ): Promise<Registration[]> {
   // Skip refresh if Firebase has no data for this claim type
-  // This prevents trying to fetch thousands of records when Firebase is empty
   if (existingIds.size === 0) {
     console.log(`Skipping refresh for ${formSlug} - no existing data in Firebase`);
     return [];
   }
 
+  // Check the API total to detect whether Firebase has gaps
+  let apiTotal = 0;
+  try {
+    const firstCheck = await fetchPage(1, 1, formSlug);
+    apiTotal = firstCheck.total;
+  } catch (error) {
+    console.warn(`Could not fetch total count for ${formSlug}, falling back to fast scan`);
+  }
+
+  const gap = apiTotal > 0 ? apiTotal - existingIds.size : 0;
+  console.log(`${formSlug}: Firebase has ${existingIds.size}, API total ${apiTotal}, gap ${gap}`);
+
+  // No meaningful gap — Firebase is up to date, nothing to do
+  if (apiTotal > 0 && gap <= 0) {
+    console.log(`${formSlug}: Firebase is up to date, skipping scan`);
+    return [];
+  }
+
   const newRegistrations: Registration[] = [];
-  let page = 1;
-  const limit = 2; // Small limit to catch records missed by limit=100 bulk fetch
-  let consecutiveOldPages = 0;
 
-  while (true) {
-    try {
-      const { data, hasMore } = await fetchPage(page, limit, formSlug);
+  const fullScan = forceFullScan || gap > 100;
+  if (fullScan) {
+    console.log(`Large gap detected (${gap}), running full scan for ${formSlug}...`);
+  }
 
-      let newInThisPage = 0;
+  {
+    let page = 1;
+    const limit = 2;
+    let consecutiveOldPages = 0;
 
-      for (const reg of data) {
-        // Add any record we don't already have
-        if (!existingIds.has(reg.id)) {
-          newRegistrations.push(reg);
-          newInThisPage++;
+    while (true) {
+      try {
+        const { data, hasMore } = await fetchPage(page, limit, formSlug);
+
+        let newInThisPage = 0;
+        for (const reg of data) {
+          if (!existingIds.has(reg.id)) {
+            newRegistrations.push(reg);
+            newInThisPage++;
+          }
         }
-      }
 
-      if (onProgress) {
-        onProgress(newRegistrations.length);
-      }
+        if (onProgress) onProgress(newRegistrations.length);
 
-      // If we got a page with no new records, we've caught up with what limit=100 fetched
-      if (newInThisPage === 0) {
-        consecutiveOldPages++;
-        // Need a few consecutive pages since missing records may be scattered
-        if (consecutiveOldPages >= 5) {
-          break;
+        if (newInThisPage === 0) {
+          consecutiveOldPages++;
+          // Full scan: go all the way to the end to catch any historical gaps
+          // Fast scan: stop early once we've caught up
+          if (!fullScan && consecutiveOldPages >= 5) break;
+          if (fullScan && !hasMore) break;
+        } else {
+          consecutiveOldPages = 0;
         }
-      } else {
-        consecutiveOldPages = 0;
+
+        if (!hasMore) break;
+        page++;
+        await sleep(1000);
+      } catch (error) {
+        console.error(`Error fetching page ${page}:`, error);
+        break;
       }
-
-      if (!hasMore) break;
-      page++;
-
-      // Rate limiting: 1 second delay between requests
-      await sleep(1000);
-
-      // Safety limit - fetch up to 100 pages (200 records with limit=2)
-      // This catches the ~100 missing records from the limit=100 bulk fetch
-      if (page > 100) break;
-    } catch (error) {
-      console.error(`Error fetching page ${page}:`, error);
-      break;
     }
   }
 
-  // Save new registrations to Firebase so everyone can see them
+  // Save new registrations to Firebase so they persist
   if (newRegistrations.length > 0) {
     try {
       await saveToFirebase(newRegistrations, formSlug);

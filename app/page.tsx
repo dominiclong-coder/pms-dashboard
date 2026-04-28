@@ -108,8 +108,8 @@ export default function Dashboard() {
   // Purchase volumes for cohort analysis
   const [purchaseVolumes, setPurchaseVolumes] = useState<PurchaseVolume[]>([]);
 
-  // Refresh to fetch newest records
-  const handleRefresh = useCallback(async () => {
+  // Shared sync logic — used by both Refresh and Full Sync
+  const runSync = useCallback(async (forceFullScan: boolean) => {
     if (!staticDataTimestamp || isRefreshing) return;
 
     setIsRefreshing(true);
@@ -123,23 +123,21 @@ export default function Dashboard() {
       for (const claimTypeInfo of CLAIM_TYPES) {
         setRefreshProgress({ form: claimTypeInfo.name, count: 0 });
 
-        // Get existing IDs to avoid duplicates
         const existingIds = new Set(
           (registrationsByForm[claimTypeInfo.slug] || []).map((r) => r.id)
         );
 
-        // Fetch only new records since the static data was built
         const newRecords = await fetchNewestRegistrations(
           claimTypeInfo.slug,
           staticDataTimestamp,
           existingIds,
           (count) => {
             setRefreshProgress({ form: claimTypeInfo.name, count });
-          }
+          },
+          forceFullScan
         );
 
         if (newRecords.length > 0) {
-          // Merge new records with existing data
           updatedData[claimTypeInfo.slug] = [
             ...newRecords,
             ...(registrationsByForm[claimTypeInfo.slug] || []),
@@ -152,12 +150,15 @@ export default function Dashboard() {
       setNewClaimsCount(totalNewClaims);
       setLastUpdated(new Date().toISOString());
     } catch (err) {
-      console.error("Refresh failed:", err);
+      console.error("Sync failed:", err);
     } finally {
       setIsRefreshing(false);
       setRefreshProgress(null);
     }
   }, [staticDataTimestamp, registrationsByForm, isRefreshing]);
+
+  const handleRefresh = useCallback(() => runSync(false), [runSync]);
+  const handleFullSync = useCallback(() => runSync(true), [runSync]);
 
   // Load static data and purchase volumes on mount
   useEffect(() => {
@@ -327,6 +328,17 @@ export default function Dashboard() {
                 <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
               )}
               {isRefreshing ? "Refreshing..." : "Refresh"}
+            </button>
+            <button
+              onClick={handleFullSync}
+              disabled={isRefreshing}
+              title="Fetch all records from MyProductCares (~4-5 mins)"
+              className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 text-sm flex items-center gap-2"
+            >
+              {isRefreshing && (
+                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              )}
+              Full Sync
             </button>
           </div>
         </div>
