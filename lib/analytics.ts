@@ -885,17 +885,14 @@ export function calculateDailyLaunchSurvival(
     const rawCutoff = new Date(startDateMs + day * 86400000).toISOString().split("T")[0];
     const cohortCutoffStr = rawCutoff < nowStr ? rawCutoff : nowStr;
 
-    // claimsCount: of purchases in [startDate, cohortCutoffStr], how many filed
-    // a claim within `day` days of their own purchase date.
-    // The claim date can fall after cohortCutoffStr — we're asking "did this buyer
-    // eventually claim within N days of purchase?", not "did they claim by Day N of launch".
+    // claimsCount: purchases in [startDate, cohortCutoffStr] with a claim date also
+    // within [startDate, cohortCutoffStr]. daysBetween <= day is guaranteed since
+    // purchase >= startDate and claim <= startDate+N means gap <= N days.
     const claimsCount = filtered.filter((reg) => {
       const purchaseDateStr = reg.shopifyOrderCreatedAt!.split("T")[0];
       if (purchaseDateStr > cohortCutoffStr) return false;
-      const daysBetween = Math.floor(
-        (new Date(reg.createdAt!).getTime() - new Date(reg.shopifyOrderCreatedAt!).getTime()) / 86400000
-      );
-      return daysBetween <= day;
+      const claimDateStr = reg.createdAt!.split("T")[0];
+      return claimDateStr <= cohortCutoffStr;
     }).length;
 
     // cohortSize: total purchases from startDate to cohortCutoffStr
