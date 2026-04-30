@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -69,8 +69,6 @@ export function DailyLaunchChartWithControls({
   const [series, setSeries] = useState<LaunchSeries[]>(DEFAULT_SERIES);
   const [maxDays, setMaxDays] = useState(30);
   const [granularity, setGranularity] = useState(1);
-  const hoveredSeriesId = useRef<string | null>(null);
-  const [, forceTooltipUpdate] = useState(0);
 
   // x-axis tick days
   const xAxisDays = useMemo(() => {
@@ -118,24 +116,28 @@ export function DailyLaunchChartWithControls({
     });
   }, [xAxisDays, seriesWithData, seriesData]);
 
-  // Custom tooltip — shows only the hovered series with claims + cohort size
+  // Custom tooltip — shows all active series at the hovered day
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const CustomTooltip = useCallback(({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
-    const targetId = hoveredSeriesId.current ?? seriesWithData[0]?.id;
-    if (!targetId) return null;
-    const p = payload.find((item: any) => item.dataKey === targetId);
-    if (!p) return null;
-    const s = seriesWithData.find((sr) => sr.id === targetId);
-    const claims = p.payload[`${targetId}_claims`] ?? 0;
-    const cohort = p.payload[`${targetId}_cohort`] ?? 0;
     return (
       <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-sm min-w-[180px]">
-        <p className="font-semibold mb-1" style={{ color: s?.color }}>{s?.label}</p>
-        <p className="text-slate-400 text-xs mb-2">Day {label}</p>
-        <p className="text-slate-700">Cumulative claims: <span className="font-semibold">{claims.toLocaleString()}</span></p>
-        <p className="text-slate-700">Purchase volume: <span className="font-semibold">{cohort.toLocaleString()}</span></p>
-        <p className="text-slate-400 text-xs mt-1">{Number(p.value ?? 0).toFixed(2)}% claim rate</p>
+        <p className="text-slate-400 text-xs mb-3">Day {label}</p>
+        {seriesWithData.map((s) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const p = payload.find((item: any) => item.dataKey === s.id);
+          if (!p) return null;
+          const claims = p.payload[`${s.id}_claims`] ?? 0;
+          const cohort = p.payload[`${s.id}_cohort`] ?? 0;
+          return (
+            <div key={s.id} className="mb-3 last:mb-0">
+              <p className="font-semibold mb-0.5" style={{ color: s.color }}>{s.label}</p>
+              <p className="text-slate-700">Cumulative claims: <span className="font-semibold">{claims.toLocaleString()}</span></p>
+              <p className="text-slate-700">Purchase volume: <span className="font-semibold">{cohort.toLocaleString()}</span></p>
+              <p className="text-slate-400 text-xs mt-0.5">{Number(p.value ?? 0).toFixed(2)}% claim rate</p>
+            </div>
+          );
+        })}
       </div>
     );
   }, [seriesWithData]);
@@ -358,14 +360,6 @@ export function DailyLaunchChartWithControls({
                 dot={false}
                 activeDot={{ r: 4 }}
                 connectNulls
-                onMouseEnter={() => {
-                  hoveredSeriesId.current = s.id;
-                  forceTooltipUpdate((n) => n + 1);
-                }}
-                onMouseLeave={() => {
-                  hoveredSeriesId.current = null;
-                  forceTooltipUpdate((n) => n + 1);
-                }}
               />
             ))}
           </LineChart>
