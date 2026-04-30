@@ -262,6 +262,9 @@ export function CohortChartWithControls({
           Showing survival rates (% of buyers who have NOT filed a claim) by purchase cohort.
           Higher percentages indicate fewer claims.
         </p>
+        <p className="text-xs text-slate-400 mt-1">
+          <span className="font-medium text-slate-500">How months are counted:</span> Months are measured from each customer&apos;s individual purchase date, not the calendar month. &ldquo;Month 0&rdquo; means within 30 days of buying — so a March cohort&apos;s Month 0 figure includes claims filed in April for customers who purchased late in the month. This ensures every customer gets a consistent 30-day window regardless of when they bought.
+        </p>
       </div>
 
       {/* Heatmap */}
