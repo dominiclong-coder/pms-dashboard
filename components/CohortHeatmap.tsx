@@ -73,6 +73,9 @@ export function CohortHeatmap({ data, maxMonths, startMonth, endMonth, globalMin
   const [hoveredCell, setHoveredCell] = useState<{ cohort: string; month: number } | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
   if (!startMonth || !endMonth) {
     return (
       <div className="p-8 text-center text-slate-500">
@@ -156,8 +159,11 @@ export function CohortHeatmap({ data, maxMonths, startMonth, endMonth, globalMin
 
               return (
                 <tr key={cohort} className="hover:bg-slate-50">
-                  <td className="sticky left-0 bg-white z-10 px-2 py-1.5 border-b border-slate-200 font-medium text-slate-700 text-xs">
+                  <td className="sticky left-0 bg-white z-10 px-2 py-1.5 border-b border-slate-200 font-medium text-slate-700 text-xs whitespace-nowrap">
                     {firstPoint?.cohortLabel || formatCohortLabel(cohort)}
+                    {cohort === currentMonth && (
+                      <span className="ml-1 text-slate-400 font-normal">(partial)</span>
+                    )}
                   </td>
                   {months.map((month) => {
                     const point = cohortData?.get(month);
@@ -205,7 +211,12 @@ export function CohortHeatmap({ data, maxMonths, startMonth, endMonth, globalMin
             maxWidth: "300px",
           }}
         >
-          <p className="font-semibold text-slate-900 mb-2">{tooltipData.cohortLabel}</p>
+          <p className="font-semibold text-slate-900 mb-2">
+            {tooltipData.cohortLabel}
+            {tooltipData.cohortMonth === currentMonth && (
+              <span className="ml-1 text-xs font-normal text-slate-400">(partial)</span>
+            )}
+          </p>
           <p className="text-sm text-slate-600 mb-1">
             <span className="font-medium">Months since purchase:</span> {tooltipData.monthsSincePurchase}
           </p>

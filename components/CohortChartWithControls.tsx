@@ -22,19 +22,23 @@ const PRODUCTS = [
   "Zima Go/Zima UV Case",
 ];
 
-// Generate list of available months (only complete months)
+// The current month in "YYYY-MM" format
+function getCurrentMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+// Generate list of available months — includes the current (partial) month
 function generateAvailableMonths(): string[] {
   const months: string[] = [];
   const now = new Date();
-
-  // Get the last complete month
-  const lastCompleteMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   // Start from Jan 2023
   const start = new Date(2023, 0, 1);
 
   let current = new Date(start);
-  while (current <= lastCompleteMonth) {
+  while (current <= currentMonth) {
     const year = current.getFullYear();
     const month = String(current.getMonth() + 1).padStart(2, "0");
     months.push(`${year}-${month}`);
@@ -44,11 +48,12 @@ function generateAvailableMonths(): string[] {
   return months;
 }
 
-// Format month for display
+// Format month for display — flags the current month as partial
 function formatMonth(yearMonth: string): string {
   const [year, month] = yearMonth.split("-");
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${monthNames[parseInt(month) - 1]} ${year}`;
+  const label = `${monthNames[parseInt(month) - 1]} ${year}`;
+  return yearMonth === getCurrentMonth() ? `${label} (partial)` : label;
 }
 
 // Calculate default date range based on claim type
@@ -60,11 +65,12 @@ function calculateDefaultMonths(
     return { startMonth: "", endMonth: "" };
   }
 
+  // Default end is always the current (partial) month
   const endMonth = availableMonths[availableMonths.length - 1];
 
   if (claimType === "warranty") {
-    // Warranty: Last 12 months from most recent month
-    const startIndex = Math.max(0, availableMonths.length - 12);
+    // Warranty: Last 12 complete months + current partial month
+    const startIndex = Math.max(0, availableMonths.length - 13);
     return { startMonth: availableMonths[startIndex], endMonth };
   } else {
     // Return: Last 12 months OR Aug 2025 onwards (whichever gives MORE data)

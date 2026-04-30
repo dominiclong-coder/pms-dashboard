@@ -3,20 +3,19 @@
  * Import ShipBob CSV export into Firebase.
  *
  * Writes to:
- *   purchase-volumes/current  — aggregated units per yearMonth × product × lot
- *   shipbob-orders/{id}       — per-order records for lot-matching against claims
+ *   purchase-volumes/current  — aggregated units per yearMonth × product × lot,
+ *                               with per-day breakdown in dailyCounts
  *
  * Usage:
  *   npx tsx scripts/import-shipbob-csv.ts [--dry-run] [path/to/file.csv]
  *
- * Default CSV path: ~/Downloads/OrdersExport_20260302_f7e513d0.csv
+ * Default CSV path: ~/Downloads/OrdersExport_20260428_b5ed8a7d.csv
  */
 
 import * as fs from "fs";
 import * as path from "path";
 import * as readline from "readline";
-import { writeBatch, doc } from "firebase/firestore";
-import { db, savePurchaseVolumes } from "../lib/firebase";
+import { savePurchaseVolumes, loadPurchaseVolumes } from "../lib/firebase";
 import { PurchaseVolume } from "../lib/types";
 
 // ---------------------------------------------------------------------------
@@ -26,7 +25,7 @@ import { PurchaseVolume } from "../lib/types";
 const DEFAULT_CSV_PATH = path.join(
   process.env.HOME ?? "~",
   "Downloads",
-  "OrdersExport_20260302_f7e513d0.csv"
+  "OrdersExport_20260428_b5ed8a7d.csv"
 );
 
 const EXCLUDED_CHANNEL = "zima-pro-usa";
@@ -61,12 +60,6 @@ function getProductsFromName(name: string): string[] {
   return [];
 }
 
-// Firestore collection for per-order records
-const SHIPBOB_ORDERS_COLLECTION = "shipbob-orders";
-
-// Batch size for Firestore writes (max 500)
-const BATCH_SIZE = 400;
-
 // Progress logging interval
 const PROGRESS_INTERVAL = 50_000;
 
@@ -74,44 +67,15 @@ const PROGRESS_INTERVAL = 50_000;
 // Types
 // ---------------------------------------------------------------------------
 
-interface ShipBobLineItem {
-  sku: string;
-  product: string;
-  quantity: number;
-  lot: string | null;
-}
-
-interface ShipBobOrder {
-  storeOrderId: string;       // normalized "#US2xxx"
-  rawStoreOrderId: string;    // original from CSV
-  purchaseDate: string;       // "YYYY-MM-DD"
-  yearMonth: string;          // "YYYY-MM"
-  channel: string;
-  lineItems: ShipBobLineItem[];
-  _importedAt: string;
-}
-
-// Key: "yearMonth|product|lot" (lot="" for null)
+// Key: "yearMonth|product|lot" (lot="" for null) → total qty
 type VolumeMap = Map<string, number>;
+
+// Key: "yearMonth|product|lot" → (date "YYYY-MM-DD" → qty)
+type DailyMap = Map<string, Map<string, number>>;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Normalize a ShipBob Store Order ID to Shopify's "#US2xxx" format.
- *
- * Patterns observed in CSV:
- *   645067        → #US2645067   (bare number)
- *   #66491        → #US266491    (# prefix, no US2)
- *   #US21402515   → #US21402515  (already correct)
- */
-function normalizeOrderId(raw: string): string {
-  if (raw.startsWith("#US2")) return raw;
-  // Strip leading # and optional US/US2 prefix, then prepend #US2
-  const digits = raw.replace(/^#(US2?)?/, "");
-  return "#US2" + digits;
-}
 
 /**
  * Parse a single CSV line, respecting quoted fields that may contain commas.
@@ -157,6 +121,16 @@ function toYearMonth(dateStr: string): string {
 }
 
 /**
+ * Normalise a raw ShipBob lot string to the canonical YYYYMM-SUFFIX format.
+ * Handles variants like "202503dp" → "202503-DP" and "202509DP" → "202509-DP".
+ * Lots that are already normalised (or are bare YYYYMM digits) are returned as-is.
+ */
+function normalizeLot(lot: string): string {
+  // If YYYYMM is immediately followed by letters (no dash), insert dash and uppercase the suffix
+  return lot.replace(/^(\d{6})([A-Za-z].*)$/, (_, date, suffix) => `${date}-${suffix.toUpperCase()}`);
+}
+
+/**
  * Extract YYYY-MM-DD from a ShipBob date string.
  * ShipBob CSV uses MM/DD/YYYY format (e.g. "12/07/2024" or "12/07/2024 10:30:00 AM").
  * Falls back to YYYY-MM-DD slice for ISO-format dates.
@@ -191,19 +165,17 @@ async function main() {
 
   // Column indices (0-based, from header row)
   const COL = {
-    STORE_ORDER_ID: 1,
     PURCHASE_DATE: 3,
     ORDER_STATUS: 9,
     LINE_ITEM_NAME: 14,
     LINE_ITEM_QTY: 15,
     LOT_NUMBER: 17,
-    SKU: 48,
     INGESTION_CHANNEL_STORE: 51,
   };
 
   // Accumulators
   const volumeMap: VolumeMap = new Map();
-  const ordersMap = new Map<string, ShipBobOrder>();
+  const dailyMap: DailyMap = new Map();
 
   // Stats
   let totalRows = 0;
@@ -228,13 +200,11 @@ async function main() {
 
       // Verify expected columns exist
       const checks: [string, number][] = [
-        ["Store Order ID", COL.STORE_ORDER_ID],
         ["Purchase Date", COL.PURCHASE_DATE],
         ["Order Status", COL.ORDER_STATUS],
         ["Line Item Name", COL.LINE_ITEM_NAME],
         ["Line Item Qty", COL.LINE_ITEM_QTY],
         ["Lot Number", COL.LOT_NUMBER],
-        ["SKU", COL.SKU],
         ["Ingestion Channel Store", COL.INGESTION_CHANNEL_STORE],
       ];
       for (const [name, idx] of checks) {
@@ -252,7 +222,7 @@ async function main() {
     if (totalRows % PROGRESS_INTERVAL === 0) {
       console.log(
         `  Progress: ${totalRows.toLocaleString()} rows processed ` +
-          `(${ordersMap.size.toLocaleString()} orders, ${volumeMap.size.toLocaleString()} volume buckets)`
+          `(${volumeMap.size.toLocaleString()} volume buckets)`
       );
     }
 
@@ -279,49 +249,27 @@ async function main() {
     }
 
     // --- Parse fields ---
-    const rawOrderId = fields[COL.STORE_ORDER_ID]?.trim() ?? "";
     const purchaseDateRaw = fields[COL.PURCHASE_DATE]?.trim() ?? "";
     const qtyStr = fields[COL.LINE_ITEM_QTY]?.trim() ?? "0";
     const lotRaw = fields[COL.LOT_NUMBER]?.trim() ?? "";
-    const sku = fields[COL.SKU]?.trim() ?? "";
 
     const purchaseDate = toDateOnly(purchaseDateRaw);
     const yearMonth = toYearMonth(purchaseDateRaw);
     const quantity = parseInt(qtyStr, 10) || 0;
-    const lot = lotRaw || null;
-    const normalizedOrderId = normalizeOrderId(rawOrderId);
+    const lot = lotRaw ? normalizeLot(lotRaw) : null;
 
     // --- Accumulate volume (one entry per product — bundles contribute to two) ---
     for (const product of products) {
       const volumeKey = `${yearMonth}|${product}|${lot ?? ""}`;
       volumeMap.set(volumeKey, (volumeMap.get(volumeKey) ?? 0) + quantity);
-    }
 
-    // --- Accumulate order ---
-    let order = ordersMap.get(normalizedOrderId);
-    if (!order) {
-      order = {
-        storeOrderId: normalizedOrderId,
-        rawStoreOrderId: rawOrderId,
-        purchaseDate,
-        yearMonth,
-        channel,
-        lineItems: [],
-        _importedAt: new Date().toISOString(),
-      };
-      ordersMap.set(normalizedOrderId, order);
-    }
-
-    // Add or merge line item per product (bundles produce two line item entries)
-    for (const product of products) {
-      const existingItem = order.lineItems.find(
-        (li) => li.sku === sku && li.product === product && li.lot === lot
-      );
-      if (existingItem) {
-        existingItem.quantity += quantity;
-      } else {
-        order.lineItems.push({ sku, product, quantity, lot });
+      // Track daily breakdown
+      let dayMap = dailyMap.get(volumeKey);
+      if (!dayMap) {
+        dayMap = new Map<string, number>();
+        dailyMap.set(volumeKey, dayMap);
       }
+      dayMap.set(purchaseDate, (dayMap.get(purchaseDate) ?? 0) + quantity);
     }
 
     processedRows++;
@@ -338,8 +286,7 @@ async function main() {
   console.log(`  Skipped (status):        ${skippedStatus.toLocaleString()}`);
   console.log(`  Skipped (no name match): ${skippedName.toLocaleString()}`);
   console.log(`  Processed rows:          ${processedRows.toLocaleString()}`);
-  console.log(`  Unique orders:        ${ordersMap.size.toLocaleString()}`);
-  console.log(`  Volume buckets:       ${volumeMap.size.toLocaleString()}`);
+  console.log(`  Volume buckets:          ${volumeMap.size.toLocaleString()}`);
   console.log("");
 
   // Per-product totals
@@ -372,50 +319,68 @@ async function main() {
   }
 
   // ---------------------------------------------------------------------------
-  // Write purchase volumes
+  // Write purchase volumes (merge with existing Firebase data)
   // ---------------------------------------------------------------------------
 
-  console.log("Writing purchase volumes to Firebase...");
+  console.log("Loading existing purchase volumes from Firebase...");
+  const existingData = await loadPurchaseVolumes();
+  const existingMap = new Map<string, PurchaseVolume>();
+  for (const pv of existingData.volumes) {
+    const key = `${pv.yearMonth}|${pv.product}|${pv.lot ?? ""}`;
+    existingMap.set(key, pv);
+  }
+  console.log(`  Found ${existingMap.size} existing volume records.`);
+
+  console.log("Merging ShipBob data with existing records...");
 
   const volumes: PurchaseVolume[] = [];
-  for (const [key, purchaseCount] of volumeMap) {
+
+  // Process all volume buckets found in the ShipBob CSV
+  for (const [key] of volumeMap) {
     const [yearMonth, product, lotStr] = key.split("|");
-    volumes.push({
-      yearMonth,
-      product,
-      lot: lotStr || null,
-      purchaseCount,
-    });
+    const lot = lotStr || null;
+    const existing = existingMap.get(key);
+
+    // Build dailyCounts from ShipBob data
+    const shipbobDailyCounts: Record<string, number> = {};
+    const dayMap = dailyMap.get(key);
+    if (dayMap) {
+      for (const [date, qty] of dayMap) {
+        shipbobDailyCounts[date] = qty;
+      }
+    }
+
+    // Merge: ShipBob daily data takes precedence for dates it covers;
+    // manually entered daily data is preserved for dates ShipBob doesn't have
+    const mergedDailyCounts: Record<string, number> = {
+      ...(existing?.dailyCounts ?? {}),
+      ...shipbobDailyCounts,
+    };
+
+    const mergedDailySum = Object.values(mergedDailyCounts).reduce((a, b) => a + b, 0);
+
+    // purchaseCount = max(existing manual entry, sum of all daily counts)
+    // This preserves any manually entered higher counts
+    const purchaseCount = Math.max(existing?.purchaseCount ?? 0, mergedDailySum);
+
+    const vol: PurchaseVolume = { yearMonth, product, lot, purchaseCount };
+    if (Object.keys(mergedDailyCounts).length > 0) {
+      vol.dailyCounts = mergedDailyCounts;
+    }
+    volumes.push(vol);
+
+    existingMap.delete(key); // mark as handled
   }
+
+  // Preserve existing volume records that ShipBob has no data for
+  for (const pv of existingMap.values()) {
+    volumes.push(pv);
+  }
+
+  console.log(`  Total volume records after merge: ${volumes.length}`);
 
   await savePurchaseVolumes({ volumes, lastUpdated: new Date().toISOString() });
   console.log(`  Saved ${volumes.length.toLocaleString()} volume records.`);
-
-  // ---------------------------------------------------------------------------
-  // Write shipbob-orders
-  // ---------------------------------------------------------------------------
-
-  console.log(`Writing ${ordersMap.size.toLocaleString()} orders to Firebase...`);
-
-  const orders = [...ordersMap.values()];
-  let ordersSaved = 0;
-
-  for (let i = 0; i < orders.length; i += BATCH_SIZE) {
-    const batch = writeBatch(db);
-    const chunk = orders.slice(i, i + BATCH_SIZE);
-
-    for (const order of chunk) {
-      const docRef = doc(db, SHIPBOB_ORDERS_COLLECTION, order.storeOrderId);
-      batch.set(docRef, order, { merge: true });
-    }
-
-    await batch.commit();
-    ordersSaved += chunk.length;
-
-    if (ordersSaved % (BATCH_SIZE * 5) === 0 || ordersSaved === orders.length) {
-      console.log(`  Orders saved: ${ordersSaved.toLocaleString()} / ${orders.length.toLocaleString()}`);
-    }
-  }
 
   console.log("");
   console.log("Import complete.");
