@@ -31,7 +31,7 @@ const DEFAULT_CSV_PATH = path.join(
 const EXCLUDED_CHANNEL = "zima-pro-usa";
 const ALLOWED_STATUSES = new Set(["Completed", "Shipped"]);
 
-const ZIMA           = "Zima Go/Zima UV Case";
+const ZIMA           = "Zima UV Case";
 const ZIMA_CASE_AIR  = "Zima Case Air";
 
 /**

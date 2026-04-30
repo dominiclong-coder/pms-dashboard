@@ -14,7 +14,7 @@ const PRODUCTS: { id: string; label: string }[] = [
   { id: "Dental Pod",                          label: "Dental Pod" },
   { id: "Dental Pod Pro",                      label: "Dental Pod Pro" },
   { id: "Dental Pod Go",                       label: "Dental Pod Go" },
-  { id: "Zima Go/Zima UV Case",                label: "Zima Go/Zima UV Case" },
+  { id: "Zima UV Case",                label: "Zima UV Case" },
 ];
 
 // Dynamic month range: Dec 2024 → 3 months ahead of today, most recent first

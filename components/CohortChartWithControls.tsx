@@ -19,7 +19,7 @@ const PRODUCTS = [
   "Dental Pod Go",
   "Dental Pod",
   "Dental Pod Pro",
-  "Zima Go/Zima UV Case",
+  "Zima UV Case",
 ];
 
 // The current month in "YYYY-MM" format

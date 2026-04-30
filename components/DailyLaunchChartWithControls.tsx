@@ -30,7 +30,7 @@ const PRODUCTS = [
   "Dental Pod",
   "Dental Pod Pro",
   "Dental Pod Go",
-  "Zima Go/Zima UV Case",
+  "Zima UV Case",
 ];
 
 const COLOR_PALETTE = [

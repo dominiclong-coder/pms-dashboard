@@ -498,7 +498,7 @@ export function extractProductType(productName: string | undefined): string {
 
   // Match Zima Go and Zima UV Case
   if (/Zima (Go|UV Case)/i.test(productName)) {
-    return "Zima Go/Zima UV Case";
+    return "Zima UV Case";
   }
 
   return "Other";
@@ -528,16 +528,20 @@ const LOT_TO_PRODUCT: Record<string, string> = {
   "202510-DP1": "Dental Pod",
   "202511-DP":  "Dental Pod",
   "202601-DP2": "Dental Pod",
+  "202604-DP":  "Dental Pod",
   "202410":     "Dental Pod Pro",
   "202504-DPP": "Dental Pod Pro",
   "202509-DPP": "Dental Pod Pro",
   "202511-DPP": "Dental Pod Pro",
   "202601-DPP": "Dental Pod Pro",
-  "202503-ZG":  "Zima Go/Zima UV Case",
-  "202509-ZG":  "Zima Go/Zima UV Case",
-  "202511-ZG":  "Zima Go/Zima UV Case",
+  "202605-DPP": "Dental Pod Pro",
+  "202503-ZG":  "Zima UV Case",
+  "202509-ZG":  "Zima UV Case",
+  "202511-ZG":  "Zima UV Case",
+  "202604-ZCV": "Zima UV Case",
   "202510-ZCA": "Zima Case Air",
   "202509-TP":  "Dental Pod Go",
+  "202604-TP":  "Dental Pod Go",
 };
 
 // Sort lot keys longest-first so prefix matching picks the most specific lot
@@ -621,7 +625,7 @@ export function calculateCohortSurvival(
         "Dental Pod",
         "Dental Pod Go",
         "Dental Pod Pro",
-        "Zima Go/Zima UV Case",
+        "Zima UV Case",
       ];
       if (!trackedProducts.includes(productType)) return false;
     } else {
@@ -671,14 +675,11 @@ export function calculateCohortSurvival(
 
   // Create purchase volume lookup map (aggregated by yearMonth|product).
   // When lotFilter is active, only sum volumes for that specific lot.
-  // Normalise legacy Firebase key "Zima Go/Zima UV Case/Zima Case Air" → "Zima Go/Zima UV Case"
-  // so existing data continues to work without a re-import.
+  // Normalise legacy Firebase keys → "Zima UV Case" so existing data continues to work without a re-import.
   const volumeMap = new Map<string, number>();
   for (const pv of purchaseVolumes) {
     if (lotFilter && lotFilter.length > 0 && !lotFilter.includes(pv.lot ? pv.lot.toUpperCase() : "Unknown")) continue;
-    const product = pv.product === "Zima Go/Zima UV Case/Zima Case Air"
-      ? "Zima Go/Zima UV Case"
-      : pv.product;
+    const product = ZIMA_LEGACY_KEYS.has(pv.product) ? "Zima UV Case" : pv.product;
     const key = `${pv.yearMonth}|${product}`;
     volumeMap.set(key, (volumeMap.get(key) ?? 0) + pv.purchaseCount);
   }
@@ -715,7 +716,7 @@ export function calculateCohortSurvival(
         "Dental Pod",
         "Dental Pod Go",
         "Dental Pod Pro",
-        "Zima Go/Zima UV Case",
+        "Zima UV Case",
       ];
 
       for (const product of allProducts) {
@@ -784,12 +785,15 @@ function daysInMonth(yearMonth: string): number {
   return new Date(year, month, 0).getDate();
 }
 
+/** Legacy Firebase product keys that should be normalised to "Zima UV Case". */
+const ZIMA_LEGACY_KEYS = new Set(["Zima Go/Zima UV Case", "Zima Go/Zima UV Case/Zima Case Air"]);
+
 /** Tracked products used when filtering "All Products". */
 const TRACKED_PRODUCTS = [
   "Dental Pod",
   "Dental Pod Go",
   "Dental Pod Pro",
-  "Zima Go/Zima UV Case",
+  "Zima UV Case",
 ];
 
 /** Valid purchase channels for warranty claims. */
@@ -853,9 +857,7 @@ export function calculateDailyLaunchSurvival(
 
   // Filter purchase volumes for this series
   const relevantVolumes = purchaseVolumes.filter((pv) => {
-    const product = pv.product === "Zima Go/Zima UV Case/Zima Case Air"
-      ? "Zima Go/Zima UV Case"
-      : pv.product;
+    const product = ZIMA_LEGACY_KEYS.has(pv.product) ? "Zima UV Case" : pv.product;
 
     if (series.product === "All Products") {
       if (!TRACKED_PRODUCTS.includes(product)) return false;

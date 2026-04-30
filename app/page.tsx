@@ -226,8 +226,8 @@ export default function Dashboard() {
     for (const pv of purchaseVolumes) {
       if (!pv.lot) continue;
       const lot = pv.lot.toUpperCase();
-      const product = pv.product === "Zima Go/Zima UV Case/Zima Case Air"
-        ? "Zima Go/Zima UV Case"
+      const product = (pv.product === "Zima Go/Zima UV Case/Zima Case Air" || pv.product === "Zima Go/Zima UV Case")
+        ? "Zima UV Case"
         : pv.product;
       if (!result[product]) result[product] = [];
       if (!result[product].includes(lot)) result[product].push(lot);

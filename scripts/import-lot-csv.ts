@@ -21,7 +21,7 @@ const PRODUCT_MAP: Record<string, string> = {
   "Dental Pod":     "Dental Pod",
   "Dental Pod Pro": "Dental Pod Pro",
   "Dental Pod Go":  "Dental Pod Go",
-  "Zima UV":        "Zima Go/Zima UV Case",
+  "Zima UV":        "Zima UV Case",
 };
 
 async function main() {
