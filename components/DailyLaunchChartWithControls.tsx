@@ -328,14 +328,14 @@ export function DailyLaunchChartWithControls({
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={340}>
-          <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 25 }}>
+          <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 30 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
             <XAxis
               dataKey="day"
               type="number"
               domain={[0, maxDays]}
               ticks={xAxisDays}
-              label={{ value: "Days since purchase", position: "insideBottom", offset: -15, fontSize: 12, fill: "#64748b" }}
+              label={{ value: "Days since launch", position: "insideBottom", offset: -15, fontSize: 12, fill: "#64748b" }}
               tick={{ fontSize: 12, fill: "#64748b" }}
             />
             <YAxis
@@ -345,6 +345,8 @@ export function DailyLaunchChartWithControls({
             />
             <Tooltip content={CustomTooltip} />
             <Legend
+              verticalAlign="top"
+              wrapperStyle={{ paddingBottom: 12 }}
               formatter={(value: string) => {
                 const s = series.find((sr) => sr.id === value);
                 return s?.label ?? value;
