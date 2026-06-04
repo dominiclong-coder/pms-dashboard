@@ -196,7 +196,7 @@ export function CohortHeatmap({ data, maxMonths, startMonth, endMonth, globalMin
                     const bgColor = (hasPurchaseData && !isPartial)
                       ? getSurvivalRateColor(point.survivalRate, true, globalMinRate, globalMaxRate)
                       : "#f1f5f9";
-                    const textColor = (hasPurchaseData && !isPartial) ? getTextColor(bgColor) : "#94a3b8";
+                    const textColor = isPartial ? "#94a3b8" : "#000000";
 
                     return (
                       <td
