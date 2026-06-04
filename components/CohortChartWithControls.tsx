@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Registration, PurchaseVolume, PurchaseVolumeData } from "@/lib/types";
 import { calculateCohortSurvival } from "@/lib/analytics";
-import { CohortHeatmap } from "./CohortHeatmap";
+import { CohortHeatmap, isCellPartial } from "./CohortHeatmap";
 import { PurchaseVolumeModal } from "./PurchaseVolumeModal";
 import { DropdownMultiSelect } from "./Filters";
 
@@ -164,10 +164,13 @@ export function CohortChartWithControls({
       claimType,
       undefined
     );
+    const now = new Date();
     let min = 100;
     let max = 0;
     for (const point of allData) {
-      if (point.purchaseVolume > 0) {
+      // Skip cells with no purchase data or an incomplete observation window —
+      // partial cells skew the scale green because fewer claims have had time to file.
+      if (point.purchaseVolume > 0 && !isCellPartial(point.cohortMonth, point.monthsSincePurchase, now)) {
         // Clamp to 0–100 so outlier cohorts with more claims than purchase volume
         // don't collapse the colour scale for everything else
         const clamped = Math.max(0, Math.min(100, point.survivalRate));

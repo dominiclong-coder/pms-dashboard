@@ -69,6 +69,20 @@ function formatCohortLabel(yearMonth: string): string {
   return `${monthNames[parseInt(month) - 1]} ${year}`;
 }
 
+/**
+ * Returns true if the observation window for this cell hasn't fully elapsed yet.
+ * Window closes at: last day of cohort month + monthOffset × 30 days.
+ * E.g. May 2026 Month 0 closes May 31 → complete once May is over.
+ *      May 2026 Month 1 closes June 30 → partial until then.
+ */
+export function isCellPartial(cohortYearMonth: string, monthOffset: number, now: Date): boolean {
+  const [y, m] = cohortYearMonth.split("-").map(Number);
+  // new Date(y, m, 0) = last day of month m (month is 1-based)
+  const lastDayMs = new Date(y, m, 0).getTime();
+  const windowCloseMs = lastDayMs + monthOffset * 30 * 24 * 60 * 60 * 1000;
+  return windowCloseMs > now.getTime();
+}
+
 export function CohortHeatmap({ data, maxMonths, startMonth, endMonth, globalMinRate, globalMaxRate }: CohortHeatmapProps) {
   const [hoveredCell, setHoveredCell] = useState<{ cohort: string; month: number } | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -178,14 +192,17 @@ export function CohortHeatmap({ data, maxMonths, startMonth, endMonth, globalMin
                     }
 
                     const hasPurchaseData = point.purchaseVolume > 0;
-                    const bgColor = getSurvivalRateColor(point.survivalRate, hasPurchaseData, globalMinRate, globalMaxRate);
-                    const textColor = getTextColor(bgColor);
+                    const isPartial = isCellPartial(cohort, month, now);
+                    const bgColor = (hasPurchaseData && !isPartial)
+                      ? getSurvivalRateColor(point.survivalRate, true, globalMinRate, globalMaxRate)
+                      : "#f1f5f9";
+                    const textColor = (hasPurchaseData && !isPartial) ? getTextColor(bgColor) : "#94a3b8";
 
                     return (
                       <td
                         key={month}
                         className="px-2 py-1.5 border-b border-slate-200 text-center text-xs font-medium cursor-default transition-opacity hover:opacity-80"
-                        style={{ backgroundColor: bgColor, color: "#000000" }}
+                        style={{ backgroundColor: bgColor, color: textColor }}
                         onMouseEnter={(e) => handleMouseEnter(cohort, month, e)}
                         onMouseMove={handleMouseMove}
                         onMouseLeave={handleMouseLeave}
@@ -217,6 +234,11 @@ export function CohortHeatmap({ data, maxMonths, startMonth, endMonth, globalMin
               <span className="ml-1 text-xs font-normal text-slate-400">(partial)</span>
             )}
           </p>
+          {isCellPartial(tooltipData.cohortMonth, tooltipData.monthsSincePurchase, now) && (
+            <p className="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1 mb-2">
+              Incomplete window — claims still incoming
+            </p>
+          )}
           <p className="text-sm text-slate-600 mb-1">
             <span className="font-medium">Months since purchase:</span> {tooltipData.monthsSincePurchase}
           </p>
@@ -236,7 +258,7 @@ export function CohortHeatmap({ data, maxMonths, startMonth, endMonth, globalMin
       )}
 
       {/* Legend */}
-      <div className="mt-4 flex items-center gap-3 text-xs text-slate-600">
+      <div className="mt-4 flex items-center gap-3 text-xs text-slate-600 flex-wrap">
         <span className="font-medium text-slate-700 text-sm">Survival Rate:</span>
         <div
           className="h-4 rounded flex-1 max-w-xs"
@@ -248,6 +270,11 @@ export function CohortHeatmap({ data, maxMonths, startMonth, endMonth, globalMin
         <span className="text-slate-400">→</span>
         <span>{globalMaxRate.toFixed(1)}%</span>
         <span className="text-slate-400 ml-2">|</span>
+        <div className="w-4 h-4 rounded flex items-center justify-center" style={{ backgroundColor: "#f1f5f9", border: "1px solid #e2e8f0" }}>
+          <span className="text-slate-400 text-xs font-medium leading-none" style={{ fontSize: "8px" }}>96%</span>
+        </div>
+        <span>Partial (window open)</span>
+        <span className="text-slate-400 ml-1">|</span>
         <div className="w-4 h-4 rounded" style={{ backgroundColor: "#f1f5f9", border: "1px solid #e2e8f0" }} />
         <span>No purchase data</span>
       </div>
